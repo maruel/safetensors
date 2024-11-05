@@ -10,7 +10,7 @@ import (
 	"log"
 	"math"
 
-	"github.com/nlpodyssey/safetensors"
+	"github.com/maruel/safetensors"
 )
 
 func ExampleDeserialize() {
