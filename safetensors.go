@@ -175,35 +175,25 @@ func prepare(dataMap map[string]TensorView, dataInfo map[string]string) (prepare
 		return ldt > rdt || (ldt == rdt && l.Name < r.Name)
 	})
 
-	tensors := make([]TensorView, len(data))
-	hMetadata := make([]namedTensorInfo, len(data))
 	offset := uint64(0)
-
-	for i, namedView := range data {
-		name, tensor := namedView.Name, namedView.TensorView
-		n := uint64(len(tensor.Data))
-		tensorInfo := TensorInfo{
-			DType:       tensor.DType,
-			Shape:       tensor.Shape,
+	m := Metadata{
+		Metadata: dataInfo,
+		Names:    make([]string, len(data)),
+		Tensors:  make([]TensorInfo, len(data)),
+	}
+	tensors := make([]TensorView, len(data))
+	for i, v := range data {
+		tensors[i] = v.TensorView
+		n := uint64(len(v.TensorView.Data))
+		m.Names[i] = v.Name
+		m.Tensors[i] = TensorInfo{
+			DType:       v.TensorView.DType,
+			Shape:       v.TensorView.Shape,
 			DataOffsets: [2]uint64{offset, offset + n},
 		}
 		offset += n
-		hMetadata[i] = namedTensorInfo{
-			Name:       name,
-			TensorInfo: tensorInfo,
-		}
-		tensors[i] = tensor
 	}
 
-	m := Metadata{
-		Metadata: dataInfo,
-		Names:    make([]string, len(hMetadata)),
-		Tensors:  make([]TensorInfo, len(hMetadata)),
-	}
-	for i, v := range hMetadata {
-		m.Names[i] = v.Name
-		m.Tensors[i] = v.TensorInfo
-	}
 	metadataBuf, err := json.Marshal(m)
 	if err != nil {
 		return preparedData{}, nil, fmt.Errorf("failed to JSON-marshal metadata: %w", err)

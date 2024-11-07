@@ -85,7 +85,7 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return fmt.Errorf("failed to JSON-decode tensor %q: %w", k, err)
 			}
-			tensors = append(tensors, namedTensorInfo{Name: k, TensorInfo: info})
+			tensors = append(tensors, namedTensorInfo{name: k, tensorInfo: info})
 		}
 	}
 
@@ -94,8 +94,8 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 	// than we expect (not aligned ordered, but purely name ordered,
 	// or actually any order).
 	sort.Slice(tensors, func(i, j int) bool {
-		a := tensors[i].TensorInfo.DataOffsets
-		b := tensors[j].TensorInfo.DataOffsets
+		a := tensors[i].tensorInfo.DataOffsets
+		b := tensors[j].tensorInfo.DataOffsets
 		return a[0] < b[0] || (a[0] == b[0] && a[1] < b[1])
 	})
 
@@ -103,8 +103,8 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 	m.Names = make([]string, len(tensors))
 	m.Tensors = make([]TensorInfo, len(tensors))
 	for i, v := range tensors {
-		m.Names[i] = v.Name
-		m.Tensors[i] = v.TensorInfo
+		m.Names[i] = v.name
+		m.Tensors[i] = v.tensorInfo
 	}
 	return nil
 }
@@ -174,8 +174,8 @@ func numElementsFromShape(shape []uint64) uint64 {
 
 // namedTensorInfo is a pair of a TensorInfo and its name (or label, or key).
 type namedTensorInfo struct {
-	Name       string
-	TensorInfo TensorInfo
+	name       string
+	tensorInfo TensorInfo
 }
 
 func unmarshalMetadata(value map[string]any) (map[string]string, error) {
