@@ -64,6 +64,31 @@ func ReadMetadata(buffer []byte) (uint64, Metadata, error) {
 	return n, metadata, nil
 }
 
+// TensorView is a view of a Tensor within a file.
+//
+// It contains references to data within the full byte-buffer
+// and is thus a readable view of a single tensor.
+type TensorView struct {
+	DType DType
+	Shape []uint64
+	Data  []byte
+}
+
+// Validate validates the object.
+func (t *TensorView) Validate() error {
+	numElements := numElementsFromShape(t.Shape)
+	if n := uint64(len(t.Data)); n != numElements*t.DType.Size() {
+		return fmt.Errorf("invalid tensor view: dtype=%s shape=%+v len(data)=%d", t.DType, t.Shape, n)
+	}
+	return nil
+}
+
+// NamedTensorView is a pair of a TensorView and its name (or label, or key).
+type NamedTensorView struct {
+	Name       string
+	TensorView TensorView
+}
+
 // NamedTensors returns a list of named views of all tensors.
 func (st *SafeTensors) NamedTensors() []NamedTensorView {
 	tensors := make([]NamedTensorView, len(st.Names))
@@ -92,7 +117,7 @@ func (st *SafeTensors) Tensor(name string) TensorView {
 	return TensorView{}
 }
 
-// Serialize the dictionary of tensors to an io.Writer (such as a file).
+// Serialize the dictionary of tensors to an io.Writer.
 func Serialize(data map[string]TensorView, dataInfo map[string]string, w io.Writer) error {
 	pd, tensors, err := prepare(data, dataInfo)
 	if err != nil {

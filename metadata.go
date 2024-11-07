@@ -134,31 +134,6 @@ type TensorInfo struct {
 	DataOffsets [2]uint64 `json:"data_offsets"`
 }
 
-// TensorView is a view of a Tensor within a file.
-//
-// It contains references to data within the full byte-buffer
-// and is thus a readable view of a single tensor.
-type TensorView struct {
-	DType DType
-	Shape []uint64
-	Data  []byte
-}
-
-// Validate validates the object.
-func (t *TensorView) Validate() error {
-	numElements := numElementsFromShape(t.Shape)
-	if n := uint64(len(t.Data)); n != numElements*t.DType.Size() {
-		return fmt.Errorf("invalid tensor view: dtype=%s shape=%+v len(data)=%d", t.DType, t.Shape, n)
-	}
-	return nil
-}
-
-// NamedTensorView is a pair of a TensorView and its name (or label, or key).
-type NamedTensorView struct {
-	Name       string
-	TensorView TensorView
-}
-
 //
 
 func numElementsFromShape(shape []uint64) uint64 {

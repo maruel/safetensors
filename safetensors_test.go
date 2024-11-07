@@ -40,8 +40,7 @@ func TestSerialize(t *testing.T) {
 		for _, v := range floatData {
 			data = binary.LittleEndian.AppendUint32(data, math.Float32bits(v))
 		}
-		shape := []uint64{1, 2, 3}
-		attn0 := TensorView{DType: F32, Shape: shape, Data: data}
+		attn0 := TensorView{DType: F32, Shape: []uint64{1, 2, 3}, Data: data}
 		require.NoError(t, attn0.Validate())
 		metadata := map[string]TensorView{"attn.0": attn0}
 
@@ -65,8 +64,7 @@ func TestSerialize(t *testing.T) {
 		for _, v := range floatData {
 			data = binary.LittleEndian.AppendUint32(data, math.Float32bits(v))
 		}
-		shape := []uint64{1, 1, 2, 3}
-		attn0 := TensorView{DType: F32, Shape: shape, Data: data}
+		attn0 := TensorView{DType: F32, Shape: []uint64{1, 1, 2, 3}, Data: data}
 		require.NoError(t, attn0.Validate())
 		// Smaller string to force misalignment compared to previous test.
 		metadata := map[string]TensorView{"attn0": attn0}
