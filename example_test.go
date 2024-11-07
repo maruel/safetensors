@@ -52,8 +52,8 @@ func ExampleSerialize() {
 
 	shape := []uint64{1, 2, 3}
 
-	tensor, err := safetensors.NewTensorView(safetensors.F32, shape, data)
-	if err != nil {
+	tensor := safetensors.TensorView{DType: safetensors.F32, Shape: shape, Data: data}
+	if err := tensor.Validate(); err != nil {
 		log.Fatal(err)
 	}
 

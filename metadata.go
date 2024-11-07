@@ -22,6 +22,7 @@ type Metadata struct {
 }
 
 // validate the Metadata object.
+//
 // In case of success, it returns the last seen offset position, that should
 // correspond to the end of the data buffer.
 func (m Metadata) validate() (uint64, error) {
@@ -72,7 +73,7 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 	}
 
 	var metadata map[string]string
-	tensors := make([]NamedTensorInfo, 0, len(raw))
+	tensors := make([]namedTensorInfo, 0, len(raw))
 	for k, v := range raw {
 		if k == "__metadata__" {
 			var err error
@@ -84,7 +85,7 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return fmt.Errorf("failed to JSON-decode tensor %q: %w", k, err)
 			}
-			tensors = append(tensors, NamedTensorInfo{Name: k, TensorInfo: info})
+			tensors = append(tensors, namedTensorInfo{Name: k, TensorInfo: info})
 		}
 	}
 
@@ -120,7 +121,62 @@ func (m Metadata) MarshalJSON() ([]byte, error) {
 	return json.Marshal(obj)
 }
 
+// TensorInfo provides information of a single tensor.
 //
+// Endianness is assumed to be little-endian. Ordering is assumed to be 'C'.
+type TensorInfo struct {
+	// The DType of each element of the tensor.
+	DType DType `json:"dtype"`
+	// The Shape of the tensor.
+	Shape []uint64 `json:"shape"`
+	// DataOffsets provides the offsets to find the data
+	// within the byte-buffer array.
+	DataOffsets [2]uint64 `json:"data_offsets"`
+}
+
+// TensorView is a view of a Tensor within a file.
+//
+// It contains references to data within the full byte-buffer
+// and is thus a readable view of a single tensor.
+type TensorView struct {
+	DType DType
+	Shape []uint64
+	Data  []byte
+}
+
+// Validate validates the object.
+func (t *TensorView) Validate() error {
+	numElements := numElementsFromShape(t.Shape)
+	if n := uint64(len(t.Data)); n != numElements*t.DType.Size() {
+		return fmt.Errorf("invalid tensor view: dtype=%s shape=%+v len(data)=%d", t.DType, t.Shape, n)
+	}
+	return nil
+}
+
+// NamedTensorView is a pair of a TensorView and its name (or label, or key).
+type NamedTensorView struct {
+	Name       string
+	TensorView TensorView
+}
+
+//
+
+func numElementsFromShape(shape []uint64) uint64 {
+	if len(shape) == 0 {
+		return 0
+	}
+	n := shape[0]
+	for _, v := range shape[1:] {
+		n *= v
+	}
+	return n
+}
+
+// namedTensorInfo is a pair of a TensorInfo and its name (or label, or key).
+type namedTensorInfo struct {
+	Name       string
+	TensorInfo TensorInfo
+}
 
 func unmarshalMetadata(value map[string]any) (map[string]string, error) {
 	result := make(map[string]string, len(value))

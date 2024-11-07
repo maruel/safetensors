@@ -154,6 +154,8 @@ func SerializeToWriter(data map[string]TensorView, dataInfo map[string]string, w
 	return nil
 }
 
+//
+
 type preparedData struct {
 	n           uint64
 	headerBytes []byte
@@ -174,7 +176,7 @@ func prepare(dataMap map[string]TensorView, dataInfo map[string]string) (prepare
 	})
 
 	tensors := make([]TensorView, len(data))
-	hMetadata := make([]NamedTensorInfo, len(data))
+	hMetadata := make([]namedTensorInfo, len(data))
 	offset := uint64(0)
 
 	for i, namedView := range data {
@@ -186,7 +188,7 @@ func prepare(dataMap map[string]TensorView, dataInfo map[string]string) (prepare
 			DataOffsets: [2]uint64{offset, offset + n},
 		}
 		offset += n
-		hMetadata[i] = NamedTensorInfo{
+		hMetadata[i] = namedTensorInfo{
 			Name:       name,
 			TensorInfo: tensorInfo,
 		}

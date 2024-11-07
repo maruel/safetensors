@@ -45,8 +45,8 @@ func TestSerialize(t *testing.T) {
 
 		shape := []uint64{1, 2, 3}
 
-		attn0, err := NewTensorView(F32, shape, data)
-		require.NoError(t, err)
+		attn0 := TensorView{DType: F32, Shape: shape, Data: data}
+		require.NoError(t, attn0.Validate())
 
 		metadata := map[string]TensorView{
 			"attn.0": attn0,
@@ -82,8 +82,8 @@ func TestSerialize(t *testing.T) {
 
 		shape := []uint64{1, 1, 2, 3}
 
-		attn0, err := NewTensorView(F32, shape, data)
-		require.NoError(t, err)
+		attn0 := TensorView{DType: F32, Shape: shape, Data: data}
+		require.NoError(t, attn0.Validate())
 
 		metadata := map[string]TensorView{
 			// Smaller string to force misalignment compared to previous test.
@@ -171,8 +171,8 @@ func TestGPT2Like(t *testing.T) {
 			for _, td := range tensorsDesc {
 				n := shapeProd(td.shape)
 				buffer := allData[offset : offset+n*dType.Size()]
-				tensor, err := NewTensorView(dType, td.shape, buffer)
-				require.NoError(t, err)
+				tensor := TensorView{DType: dType, Shape: td.shape, Data: buffer}
+				require.NoError(t, tensor.Validate())
 				metadata[td.name] = tensor
 				offset += n
 			}
