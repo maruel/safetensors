@@ -26,8 +26,8 @@ func ExampleDeserialize() {
 	fmt.Printf("len = %d\n", len(loaded.Tensors))
 	fmt.Printf("names = %+v\n", loaded.Names)
 
-	tensor, ok := loaded.Tensor("test")
-	if !ok {
+	tensor := loaded.Tensor("test")
+	if tensor.DType == "" {
 		log.Fatal(`tensor "test" not found`)
 	}
 

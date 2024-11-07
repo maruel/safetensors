@@ -21,17 +21,18 @@ type SafeTensors struct {
 	data []byte
 }
 
-// Deserialize parses a byte-buffer representing the whole
-// safetensor file and returns the deserialized form (no tensor allocation).
-func Deserialize(buffer []byte) (SafeTensors, error) {
-	n, metadata, err := ReadMetadata(buffer)
+// Deserialize parses a byte-buffer representing the whole safetensor file and
+// returns the deserialized form (no tensor allocation).
+func Deserialize(buffer []byte) (*SafeTensors, error) {
+	s := &SafeTensors{}
+	var n uint64
+	var err error
+	n, s.Metadata, err = ReadMetadata(buffer)
 	if err != nil {
-		return SafeTensors{}, err
+		return nil, err
 	}
-	return SafeTensors{
-		Metadata: metadata,
-		data:     buffer[n+8:],
-	}, nil
+	s.data = buffer[n+8:]
+	return s, nil
 }
 
 // ReadMetadata parses the header and returns the size of the header + parsed
@@ -39,23 +40,18 @@ func Deserialize(buffer []byte) (SafeTensors, error) {
 func ReadMetadata(buffer []byte) (uint64, Metadata, error) {
 	bufferLen := uint64(len(buffer))
 	if bufferLen < 8 {
-		return 0, Metadata{}, fmt.Errorf("header too small")
+		return 0, Metadata{}, fmt.Errorf("header (%d bytes) too small", bufferLen)
 	}
-
-	arr := buffer[:8]
-	n := binary.LittleEndian.Uint64(arr)
+	n := binary.LittleEndian.Uint64(buffer)
 	if n > maxHeaderSize {
 		return 0, Metadata{}, fmt.Errorf("header too large: max %d, actual %d", maxHeaderSize, n)
 	}
-
 	stop := n + 8
 	if stop > bufferLen {
-		return 0, Metadata{}, fmt.Errorf("invalid header length")
+		return 0, Metadata{}, fmt.Errorf("invalid header length %d", stop)
 	}
-
 	var metadata Metadata
-	err := json.Unmarshal(buffer[8:stop], &metadata)
-	if err != nil {
+	if err := json.Unmarshal(buffer[8:stop], &metadata); err != nil {
 		return 0, Metadata{}, fmt.Errorf("invalid header deserialization: %w", err)
 	}
 	bufferEnd, err := metadata.validate()
@@ -71,37 +67,29 @@ func ReadMetadata(buffer []byte) (uint64, Metadata, error) {
 // NamedTensors returns a list of named views of all tensors.
 func (st *SafeTensors) NamedTensors() []NamedTensorView {
 	tensors := make([]NamedTensorView, len(st.Names))
-	for index, name := range st.Names {
-		info := &st.Tensors[index]
-		tensors[index] = NamedTensorView{
-			Name: name,
-			TensorView: TensorView{
-				DType: info.DType,
-				Shape: info.Shape,
-				Data:  st.data[info.DataOffsets[0]:info.DataOffsets[1]],
-			},
+	for i, t := range st.Tensors {
+		tensors[i] = NamedTensorView{
+			Name:       st.Names[i],
+			TensorView: TensorView{DType: t.DType, Shape: t.Shape, Data: st.data[t.DataOffsets[0]:t.DataOffsets[1]]},
 		}
 	}
 	return tensors
 }
 
-// Tensor retrieves a the view of a specific tensor by name.
+// Tensor retrieves the view of a specific tensor by name.
 //
-// The returned boolean flag reports whether the tensor was found.
-func (st *SafeTensors) Tensor(name string) (TensorView, bool) {
+// Returns an empty invalid tensor if not found.
+func (st *SafeTensors) Tensor(name string) TensorView {
 	// Linear search for now. Normally the number of tensors is at most in the
 	// low hundreds so it's not a big deal. If it becomes an issue, uses a
 	// private map.
 	for i, n := range st.Names {
 		if n == name {
-			return TensorView{
-				DType: st.Tensors[i].DType,
-				Shape: st.Tensors[i].Shape,
-				Data:  st.data[st.Tensors[i].DataOffsets[0]:st.Tensors[i].DataOffsets[1]],
-			}, true
+			t := st.Tensors[i]
+			return TensorView{DType: t.DType, Shape: t.Shape, Data: st.data[t.DataOffsets[0]:t.DataOffsets[1]]}
 		}
 	}
-	return TensorView{}, false
+	return TensorView{}
 }
 
 // Serialize the dictionary of tensors to a byte buffer.

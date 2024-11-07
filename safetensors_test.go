@@ -27,11 +27,9 @@ func TestDeserialize(t *testing.T) {
 	assert.Equal(t, 1, len(loaded.Tensors))
 	assert.Equal(t, []string{"test"}, loaded.Names)
 
-	tensor, ok := loaded.Tensor("test")
-	assert.True(t, ok)
-
-	assert.Equal(t, []uint64{2, 2}, tensor.Shape)
+	tensor := loaded.Tensor("test")
 	assert.Equal(t, I32, tensor.DType)
+	assert.Equal(t, []uint64{2, 2}, tensor.Shape)
 	assert.Equal(t, make([]byte, 16), tensor.Data)
 }
 
@@ -213,10 +211,9 @@ func TestEmptyShapesAllowed(t *testing.T) {
 	loaded, err := Deserialize(serialized)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"test"}, loaded.Names)
-	tensor, ok := loaded.Tensor("test")
-	require.True(t, ok)
-	assert.Equal(t, []uint64{}, tensor.Shape)
+	tensor := loaded.Tensor("test")
 	assert.Equal(t, I32, tensor.DType)
+	assert.Equal(t, []uint64{}, tensor.Shape)
 	assert.Equal(t, []byte{0, 0, 0, 0}, tensor.Data)
 }
 
@@ -287,17 +284,17 @@ func TestHeaderTooLarge(t *testing.T) {
 }
 
 func TestHeaderTooSmall(t *testing.T) {
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		data := make([]byte, i)
 		_, err := Deserialize(data)
-		assert.EqualErrorf(t, err, "header too small", "data len = %d", i)
+		assert.EqualErrorf(t, err, fmt.Sprintf("header (%d bytes) too small", i), "data len = %d", i)
 	}
 }
 
 func TestInvalidHeaderLength(t *testing.T) {
 	serialized := []byte("<\x00\x00\x00\x00\x00\x00\x00")
 	_, err := Deserialize(serialized)
-	assert.EqualError(t, err, "invalid header length")
+	assert.EqualError(t, err, "invalid header length 68")
 }
 
 func TestInvalidHeaderNonUTF8(t *testing.T) {
@@ -319,10 +316,9 @@ func TestZeroSizedTensor(t *testing.T) {
 	loaded, err := Deserialize(serialized)
 	require.NoError(t, err)
 	require.Equal(t, []string{"test"}, loaded.Names)
-	tensor, ok := loaded.Tensor("test")
-	require.True(t, ok)
-	assert.Equal(t, []uint64{2, 0}, tensor.Shape)
+	tensor := loaded.Tensor("test")
 	assert.Equal(t, I32, tensor.DType)
+	assert.Equal(t, []uint64{2, 0}, tensor.Shape)
 	assert.Equal(t, []byte{}, tensor.Data)
 }
 
