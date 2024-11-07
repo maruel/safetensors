@@ -12,6 +12,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -83,8 +84,22 @@ func TestSerialize(t *testing.T) {
 			160, 64,
 		}
 		assert.Equal(t, want, buf.Bytes())
-		_, err := Deserialize(buf.Bytes())
+		n, err := Deserialize(buf.Bytes())
 		require.NoError(t, err)
+
+		wantT := []NamedTensorView{
+			{
+				Name: "attn0",
+				TensorView: TensorView{
+					DType: "F32",
+					Shape: []uint64{1, 1, 2, 3},
+					Data:  data,
+				},
+			},
+		}
+		if diff := cmp.Diff(wantT, n.NamedTensors()); diff != "" {
+			t.Fatalf("(-want,+got)\n%s", diff)
+		}
 	})
 }
 

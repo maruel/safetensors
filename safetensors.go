@@ -119,17 +119,17 @@ func (st *SafeTensors) Tensor(name string) TensorView {
 
 // Serialize the dictionary of tensors to an io.Writer.
 func Serialize(data map[string]TensorView, dataInfo map[string]string, w io.Writer) error {
-	pd, tensors, err := prepare(data, dataInfo)
+	header, tensors, err := prepare(data, dataInfo)
 	if err != nil {
 		return err
 	}
 
 	var nbArr [8]byte
-	binary.LittleEndian.PutUint64(nbArr[:], pd.n)
+	binary.LittleEndian.PutUint64(nbArr[:], uint64(len(header)))
 	if _, err = w.Write(nbArr[:]); err != nil {
 		return err
 	}
-	if _, err = w.Write(pd.headerBytes); err != nil {
+	if _, err = w.Write(header); err != nil {
 		return err
 	}
 	for _, tensor := range tensors {
@@ -142,13 +142,7 @@ func Serialize(data map[string]TensorView, dataInfo map[string]string, w io.Writ
 
 //
 
-type preparedData struct {
-	n           uint64
-	headerBytes []byte
-	offset      uint64
-}
-
-func prepare(dataMap map[string]TensorView, dataInfo map[string]string) (preparedData, []TensorView, error) {
+func prepare(dataMap map[string]TensorView, dataInfo map[string]string) ([]byte, []TensorView, error) {
 	// Make sure we're sorting by descending dtype alignment,
 	// then by name.
 	data := make([]NamedTensorView, 0, len(dataMap))
@@ -182,24 +176,12 @@ func prepare(dataMap map[string]TensorView, dataInfo map[string]string) (prepare
 
 	metadataBuf, err := json.Marshal(m)
 	if err != nil {
-		return preparedData{}, nil, fmt.Errorf("failed to JSON-marshal metadata: %w", err)
+		return nil, nil, fmt.Errorf("failed to JSON-marshal metadata: %w", err)
 	}
 
 	// Force alignment to 8 bytes.
-	extra := (8 - len(metadataBuf)%8) % 8
-	if extra > 0 {
-		spaces := make([]byte, extra)
-		for i := range spaces {
-			spaces[i] = ' '
-		}
-		metadataBuf = append(metadataBuf, spaces...)
+	if extra := (8 - len(metadataBuf)%8) % 8; extra > 0 {
+		metadataBuf = append(metadataBuf, "       "[:extra]...)
 	}
-
-	pd := preparedData{
-		n:           uint64(len(metadataBuf)),
-		headerBytes: metadataBuf,
-		offset:      offset,
-	}
-
-	return pd, tensors, nil
+	return metadataBuf, tensors, nil
 }
