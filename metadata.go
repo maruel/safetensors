@@ -170,93 +170,55 @@ func unmarshalTensorInfo(m map[string]any) (TensorInfo, error) {
 		return TensorInfo{}, fmt.Errorf("invalid keys: expected 3 keys (dtype, shape, data_offsets), actual %d", len(m))
 	}
 
-	dType, err := unmarshalTIDType(m)
+	dType, err := unmarshalTIDType(m["dtype"])
 	if err != nil {
-		return TensorInfo{}, err
+		return TensorInfo{}, fmt.Errorf(`invalid "dtype": %w`, err)
 	}
 
-	shape, err := unmarshalTIShape(m)
+	shape, err := unmarshalSliceUint64(m["shape"])
 	if err != nil {
-		return TensorInfo{}, err
+		return TensorInfo{}, fmt.Errorf(`invalid "shape": %w`, err)
 	}
 
-	dataOffsets, err := unmarshalTIDataOffsets(m)
+	dataOffsets, err := unmarshalSliceUint64(m["data_offsets"])
 	if err != nil {
-		return TensorInfo{}, err
+		return TensorInfo{}, fmt.Errorf(`invalid "data_offsets": %w`, err)
 	}
-
-	return TensorInfo{
-		DType:       dType,
-		Shape:       shape,
-		DataOffsets: dataOffsets,
-	}, nil
+	if len(dataOffsets) != 2 {
+		return TensorInfo{}, fmt.Errorf(`invalid "data_offsets": expected array of 2 elements, got %#v`, dataOffsets)
+	}
+	ti := TensorInfo{DType: dType, Shape: shape}
+	ti.DataOffsets[0] = dataOffsets[0]
+	ti.DataOffsets[1] = dataOffsets[1]
+	return ti, nil
 }
 
-func unmarshalTIDType(m map[string]any) (DType, error) {
-	v, ok := m["dtype"]
-	if !ok {
-		return "", fmt.Errorf(`missing "dtype"`)
-	}
+func unmarshalTIDType(v any) (DType, error) {
 	s, ok := v.(string)
 	if !ok || dTypeToSize[DType(s)] == 0 {
-		return "", fmt.Errorf(`invalid "dtype" value: %#v of type %T`, v, v)
+		return "", fmt.Errorf(`%#v of type %T`, v, v)
 	}
 	return DType(s), nil
 }
 
-func unmarshalTIShape(m map[string]any) ([]uint64, error) {
-	v, ok := m["shape"]
-	if !ok {
-		return nil, fmt.Errorf(`missing "shape"`)
-	}
+func unmarshalSliceUint64(v any) ([]uint64, error) {
 	values, ok := v.([]any)
 	if !ok {
-		return nil, fmt.Errorf(`invalid "shape" value: expected array, actual %#v`, v)
+		return nil, fmt.Errorf(`expected array, actual %#v`, v)
 	}
-
 	shape := make([]uint64, len(values))
 	for i, val := range values {
 		jn, ok := val.(json.Number)
 		if !ok {
-			return nil, fmt.Errorf(`invalid "shape" value: expected array of natural numbers, actual %#v`, v)
+			return nil, fmt.Errorf(`iexpected array of natural numbers, actual %#v`, v)
 		}
 		n, err := strconv.ParseUint(jn.String(), 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf(`invalid "shape" value: expected array of natural numbers, actual %#v: %w`, v, err)
+			return nil, fmt.Errorf(`expected array of natural numbers, actual %#v: %w`, v, err)
 		}
 		shape[i] = n
 	}
-
 	return shape, nil
-}
-
-func unmarshalTIDataOffsets(m map[string]any) ([2]uint64, error) {
-	v, ok := m["data_offsets"]
-	if !ok {
-		return [2]uint64{}, fmt.Errorf(`missing "data_offsets"`)
-	}
-	values, ok := v.([]any)
-	if !ok {
-		return [2]uint64{}, fmt.Errorf(`invalid "data_offsets" value: expected array, actual %#v`, v)
-	}
-	if len(values) != 2 {
-		return [2]uint64{}, fmt.Errorf(`invalid "data_offsets" value: expected array of 2 elements, actual len %d: %#v`, len(values), values)
-	}
-
-	var dataOffsets [2]uint64
-	for i, val := range values {
-		jn, ok := val.(json.Number)
-		if !ok {
-			return [2]uint64{}, fmt.Errorf(`invalid "data_offsets" value: expected array of natural numbers, actual %#v`, v)
-		}
-		n, err := strconv.ParseUint(jn.String(), 10, 64)
-		if err != nil {
-			return [2]uint64{}, fmt.Errorf(`invalid "data_offsets" value: expected array of natural numbers, actual %#v: %w`, v, err)
-		}
-		dataOffsets[i] = n
-	}
-
-	return dataOffsets, nil
 }
 
 // checkedMul multiplies a and b and checks for overflow.
