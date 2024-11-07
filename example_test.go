@@ -31,9 +31,9 @@ func ExampleDeserialize() {
 		log.Fatal(`tensor "test" not found`)
 	}
 
-	fmt.Printf("tensor type = %s\n", tensor.DType())
-	fmt.Printf("tensor shape = %+v\n", tensor.Shape())
-	fmt.Printf("tensor data len = %+v\n", tensor.DataLen())
+	fmt.Printf("tensor type = %s\n", tensor.DType)
+	fmt.Printf("tensor shape = %+v\n", tensor.Shape)
+	fmt.Printf("tensor data len = %+v\n", len(tensor.Data))
 
 	// Output:
 	// len = 1

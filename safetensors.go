@@ -76,9 +76,9 @@ func (st SafeTensors) Tensors() []NamedTensorView {
 		tensors[index] = NamedTensorView{
 			Name: name,
 			TensorView: TensorView{
-				dType: info.DType,
-				shape: info.Shape,
-				data:  st.data[info.DataOffsets[0]:info.DataOffsets[1]],
+				DType: info.DType,
+				Shape: info.Shape,
+				Data:  st.data[info.DataOffsets[0]:info.DataOffsets[1]],
 			},
 		}
 	}
@@ -94,9 +94,9 @@ func (st SafeTensors) Tensor(name string) (TensorView, bool) {
 	}
 	info := &st.metadata.tensors[index]
 	return TensorView{
-		dType: info.DType,
-		shape: info.Shape,
-		data:  st.data[info.DataOffsets[0]:info.DataOffsets[1]],
+		DType: info.DType,
+		Shape: info.Shape,
+		Data:  st.data[info.DataOffsets[0]:info.DataOffsets[1]],
 	}, true
 }
 
@@ -120,7 +120,7 @@ func (st SafeTensors) IsEmpty() bool {
 }
 
 // Serialize the dictionary of tensors to a byte buffer.
-func Serialize[V View](data map[string]V, dataInfo map[string]string) ([]byte, error) {
+func Serialize(data map[string]TensorView, dataInfo map[string]string) ([]byte, error) {
 	pd, tensors, err := prepare(data, dataInfo)
 	if err != nil {
 		return nil, err
@@ -130,7 +130,7 @@ func Serialize[V View](data map[string]V, dataInfo map[string]string) ([]byte, e
 	buffer = binary.LittleEndian.AppendUint64(buffer, pd.n)
 	buffer = append(buffer, pd.headerBytes...)
 	for _, tensor := range tensors {
-		buffer = append(buffer, tensor.Data()...)
+		buffer = append(buffer, tensor.Data...)
 	}
 	return buffer, nil
 }
@@ -139,7 +139,7 @@ func Serialize[V View](data map[string]V, dataInfo map[string]string) ([]byte, e
 //
 // Compared to Serialize, this procedure reduces the need to allocate the
 // whole amount of memory.
-func SerializeToWriter[V View](data map[string]V, dataInfo map[string]string, w io.Writer) error {
+func SerializeToWriter(data map[string]TensorView, dataInfo map[string]string, w io.Writer) error {
 	pd, tensors, err := prepare(data, dataInfo)
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func SerializeToWriter[V View](data map[string]V, dataInfo map[string]string, w 
 	}
 
 	for _, tensor := range tensors {
-		_, err = w.Write(tensor.Data())
+		_, err = w.Write(tensor.Data)
 		if err != nil {
 			return err
 		}
@@ -175,29 +175,29 @@ type preparedData struct {
 	offset      uint64
 }
 
-func prepare[V View](dataMap map[string]V, dataInfo map[string]string) (preparedData, []V, error) {
+func prepare(dataMap map[string]TensorView, dataInfo map[string]string) (preparedData, []TensorView, error) {
 	// Make sure we're sorting by descending dtype alignment,
 	// then by name.
-	data := make([]NamedView[V], 0, len(dataMap))
+	data := make([]NamedTensorView, 0, len(dataMap))
 	for k, v := range dataMap {
-		data = append(data, NamedView[V]{Name: k, View: v})
+		data = append(data, NamedTensorView{Name: k, TensorView: v})
 	}
 	sort.Slice(data, func(i, j int) bool {
 		l, r := &data[i], &data[j]
-		ldt, rdt := l.View.DType(), r.View.DType()
+		ldt, rdt := l.TensorView.DType.Size(), r.TensorView.DType.Size()
 		return ldt > rdt || (ldt == rdt && l.Name < r.Name)
 	})
 
-	tensors := make([]V, len(data))
+	tensors := make([]TensorView, len(data))
 	hMetadata := make([]NamedTensorInfo, len(data))
 	offset := uint64(0)
 
 	for i, namedView := range data {
-		name, tensor := namedView.Name, namedView.View
-		n := tensor.DataLen()
+		name, tensor := namedView.Name, namedView.TensorView
+		n := uint64(len(tensor.Data))
 		tensorInfo := TensorInfo{
-			DType:       tensor.DType(),
-			Shape:       tensor.Shape(),
+			DType:       tensor.DType,
+			Shape:       tensor.Shape,
 			DataOffsets: [2]uint64{offset, offset + n},
 		}
 		offset += n

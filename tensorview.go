@@ -11,9 +11,9 @@ import "fmt"
 // It contains references to data within the full byte-buffer
 // and is thus a readable view of a single tensor.
 type TensorView struct {
-	dType DType
-	shape []uint64
-	data  []byte
+	DType DType
+	Shape []uint64
+	Data  []byte
 }
 
 // NamedTensorView is a pair of a TensorView and its name (or label, or key).
@@ -21,11 +21,6 @@ type NamedTensorView struct {
 	Name       string
 	TensorView TensorView
 }
-
-func (tv TensorView) DType() DType    { return tv.dType }
-func (tv TensorView) Shape() []uint64 { return tv.shape }
-func (tv TensorView) Data() []byte    { return tv.data }
-func (tv TensorView) DataLen() uint64 { return uint64(len(tv.data)) }
 
 // NewTensorView creates a new TensorView.
 func NewTensorView(dType DType, shape []uint64, data []byte) (TensorView, error) {
@@ -37,9 +32,9 @@ func NewTensorView(dType DType, shape []uint64, data []byte) (TensorView, error)
 	}
 
 	return TensorView{
-		dType: dType,
-		shape: shape,
-		data:  data,
+		DType: dType,
+		Shape: shape,
+		Data:  data,
 	}, nil
 }
 

@@ -30,9 +30,9 @@ func TestDeserialize(t *testing.T) {
 	tensor, ok := loaded.Tensor("test")
 	assert.True(t, ok)
 
-	assert.Equal(t, []uint64{2, 2}, tensor.Shape())
-	assert.Equal(t, I32, tensor.DType())
-	assert.Equal(t, make([]byte, 16), tensor.Data())
+	assert.Equal(t, []uint64{2, 2}, tensor.Shape)
+	assert.Equal(t, I32, tensor.DType)
+	assert.Equal(t, make([]byte, 16), tensor.Data)
 }
 
 func TestSerialize(t *testing.T) {
@@ -215,9 +215,9 @@ func TestEmptyShapesAllowed(t *testing.T) {
 	assert.Equal(t, []string{"test"}, loaded.Names())
 	tensor, ok := loaded.Tensor("test")
 	require.True(t, ok)
-	assert.Equal(t, []uint64{}, tensor.shape)
-	assert.Equal(t, I32, tensor.DType())
-	assert.Equal(t, []byte{0, 0, 0, 0}, tensor.Data())
+	assert.Equal(t, []uint64{}, tensor.Shape)
+	assert.Equal(t, I32, tensor.DType)
+	assert.Equal(t, []byte{0, 0, 0, 0}, tensor.Data)
 }
 
 func TestJSONAttack(t *testing.T) {
@@ -321,9 +321,9 @@ func TestZeroSizedTensor(t *testing.T) {
 	require.Equal(t, []string{"test"}, loaded.Names())
 	tensor, ok := loaded.Tensor("test")
 	require.True(t, ok)
-	assert.Equal(t, []uint64{2, 0}, tensor.Shape())
-	assert.Equal(t, I32, tensor.DType())
-	assert.Equal(t, []byte{}, tensor.Data())
+	assert.Equal(t, []uint64{2, 0}, tensor.Shape)
+	assert.Equal(t, I32, tensor.DType)
+	assert.Equal(t, []byte{}, tensor.Data)
 }
 
 func TestInvalidInfo(t *testing.T) {
