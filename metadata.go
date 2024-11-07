@@ -15,25 +15,10 @@ import (
 // Metadata represents the header of safetensor files which allow
 // indexing into the raw byte-buffer array and indicates how to interpret it.
 type Metadata struct {
-	metadata map[string]string
-	tensors  []TensorInfo
-	indexMap map[string]uint64
-}
-
-func newMetadata(metadata map[string]string, tensors []NamedTensorInfo) Metadata {
-	indexMap := make(map[string]uint64, len(tensors))
-	metaTensors := make([]TensorInfo, len(tensors))
-
-	for i, v := range tensors {
-		indexMap[v.Name] = uint64(i)
-		metaTensors[i] = v.TensorInfo
-	}
-
-	return Metadata{
-		metadata: metadata,
-		tensors:  metaTensors,
-		indexMap: indexMap,
-	}
+	// Metadata is the tensors' metadata.
+	Metadata map[string]string
+	Names    []string
+	Tensors  []TensorInfo
 }
 
 // validate the Metadata object.
@@ -41,14 +26,14 @@ func newMetadata(metadata map[string]string, tensors []NamedTensorInfo) Metadata
 // correspond to the end of the data buffer.
 func (m Metadata) validate() (uint64, error) {
 	start := uint64(0)
-	for i, info := range m.tensors {
+	for i, info := range m.Tensors {
 		s := info.DataOffsets[0]
 		e := info.DataOffsets[1]
 
 		if s != start || e < s {
 			tensorName := "no_tensor"
-			for name, index := range m.indexMap {
-				if index == uint64(i) {
+			for index, name := range m.Names {
+				if index == i {
 					tensorName = name
 					break
 				}
@@ -78,37 +63,20 @@ func (m Metadata) validate() (uint64, error) {
 	return start, nil
 }
 
-// Tensors returns all tensors' info.
-func (m Metadata) Tensors() map[string]*TensorInfo {
-	result := make(map[string]*TensorInfo, len(m.indexMap))
-	for name, index := range m.indexMap {
-		result[name] = &m.tensors[index]
-	}
-	return result
-}
-
-// Metadata returns the tensors' metadata.
-func (m Metadata) Metadata() map[string]string {
-	return m.metadata
-}
-
 func (m *Metadata) UnmarshalJSON(data []byte) error {
 	var raw map[string]map[string]any
-
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
-	err := dec.Decode(&raw)
-	if err != nil {
+	if err := dec.Decode(&raw); err != nil {
 		return fmt.Errorf("failed to unmarshal Metadata: %w", err)
 	}
 
 	var metadata map[string]string
 	tensors := make([]NamedTensorInfo, 0, len(raw))
-
 	for k, v := range raw {
 		if k == "__metadata__" {
-			metadata, err = unmarshalMetadata(v)
-			if err != nil {
+			var err error
+			if metadata, err = unmarshalMetadata(v); err != nil {
 				return err
 			}
 		} else {
@@ -116,10 +84,7 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return fmt.Errorf("failed to JSON-decode tensor %q: %w", k, err)
 			}
-			tensors = append(tensors, NamedTensorInfo{
-				Name:       k,
-				TensorInfo: info,
-			})
+			tensors = append(tensors, NamedTensorInfo{Name: k, TensorInfo: info})
 		}
 	}
 
@@ -133,7 +98,13 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 		return a[0] < b[0] || (a[0] == b[0] && a[1] < b[1])
 	})
 
-	*m = newMetadata(metadata, tensors)
+	m.Metadata = metadata
+	m.Names = make([]string, len(tensors))
+	m.Tensors = make([]TensorInfo, len(tensors))
+	for i, v := range tensors {
+		m.Names[i] = v.Name
+		m.Tensors[i] = v.TensorInfo
+	}
 	return nil
 }
 
@@ -244,12 +215,13 @@ func unmarshalTIDataOffsets(m map[string]any) ([2]uint64, error) {
 }
 
 func (m Metadata) MarshalJSON() ([]byte, error) {
-	obj := make(map[string]any, len(m.indexMap)+1)
-	if len(m.metadata) > 0 {
-		obj["__metadata__"] = m.metadata
+	// TODO: Keep ordering!
+	obj := make(map[string]any, len(m.Names)+1)
+	if len(m.Metadata) > 0 {
+		obj["__metadata__"] = m.Metadata
 	}
-	for name, index := range m.indexMap {
-		obj[name] = &m.tensors[index]
+	for index, name := range m.Names {
+		obj[name] = &m.Tensors[index]
 	}
 	return json.Marshal(obj)
 }

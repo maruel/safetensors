@@ -24,8 +24,8 @@ func TestDeserialize(t *testing.T) {
 	loaded, err := Deserialize(serialized)
 	require.NoError(t, err)
 
-	assert.Equal(t, 1, loaded.Len())
-	assert.Equal(t, []string{"test"}, loaded.Names())
+	assert.Equal(t, 1, len(loaded.Metadata.Tensors))
+	assert.Equal(t, []string{"test"}, loaded.Metadata.Names)
 
 	tensor, ok := loaded.Tensor("test")
 	assert.True(t, ok)
@@ -212,7 +212,7 @@ func TestEmptyShapesAllowed(t *testing.T) {
 
 	loaded, err := Deserialize(serialized)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"test"}, loaded.Names())
+	assert.Equal(t, []string{"test"}, loaded.Metadata.Names)
 	tensor, ok := loaded.Tensor("test")
 	require.True(t, ok)
 	assert.Equal(t, []uint64{}, tensor.Shape)
@@ -318,7 +318,7 @@ func TestZeroSizedTensor(t *testing.T) {
 
 	loaded, err := Deserialize(serialized)
 	require.NoError(t, err)
-	require.Equal(t, []string{"test"}, loaded.Names())
+	require.Equal(t, []string{"test"}, loaded.Metadata.Names)
 	tensor, ok := loaded.Tensor("test")
 	require.True(t, ok)
 	assert.Equal(t, []uint64{2, 0}, tensor.Shape)

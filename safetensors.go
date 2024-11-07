@@ -17,7 +17,7 @@ const maxHeaderSize = 100_000_000
 // SafeTensors is a structure owning some metadata to lookup tensors
 // on a shared `data` byte-buffer.
 type SafeTensors struct {
-	metadata Metadata
+	Metadata Metadata
 	data     []byte
 }
 
@@ -29,7 +29,7 @@ func Deserialize(buffer []byte) (SafeTensors, error) {
 		return SafeTensors{}, err
 	}
 	return SafeTensors{
-		metadata: metadata,
+		Metadata: metadata,
 		data:     buffer[n+8:],
 	}, nil
 }
@@ -70,9 +70,9 @@ func ReadMetadata(buffer []byte) (uint64, Metadata, error) {
 
 // Tensors returns a list of named views of all tensors.
 func (st SafeTensors) Tensors() []NamedTensorView {
-	tensors := make([]NamedTensorView, len(st.metadata.indexMap))
-	for name, index := range st.metadata.indexMap {
-		info := &st.metadata.tensors[index]
+	tensors := make([]NamedTensorView, len(st.Metadata.Names))
+	for index, name := range st.Metadata.Names {
+		info := &st.Metadata.Tensors[index]
 		tensors[index] = NamedTensorView{
 			Name: name,
 			TensorView: TensorView{
@@ -85,38 +85,23 @@ func (st SafeTensors) Tensors() []NamedTensorView {
 	return tensors
 }
 
-// Tensor allows the user to get the view of a specific tensor by name.
+// Tensor retrieves a the view of a specific tensor by name.
+//
 // The returned boolean flag reports whether the tensor was found.
 func (st SafeTensors) Tensor(name string) (TensorView, bool) {
-	index, ok := st.metadata.indexMap[name]
-	if !ok {
-		return TensorView{}, false
+	// Linear search for now. Normally the number of tensors is at most in the
+	// low hundreds so it's not a big deal. If it becomes an issue, uses a
+	// private map.
+	for i, n := range st.Metadata.Names {
+		if n == name {
+			return TensorView{
+				DType: st.Metadata.Tensors[i].DType,
+				Shape: st.Metadata.Tensors[i].Shape,
+				Data:  st.data[st.Metadata.Tensors[i].DataOffsets[0]:st.Metadata.Tensors[i].DataOffsets[1]],
+			}, true
+		}
 	}
-	info := &st.metadata.tensors[index]
-	return TensorView{
-		DType: info.DType,
-		Shape: info.Shape,
-		Data:  st.data[info.DataOffsets[0]:info.DataOffsets[1]],
-	}, true
-}
-
-// The Names of all tensors.
-func (st SafeTensors) Names() []string {
-	names := make([]string, len(st.metadata.indexMap))
-	for name, index := range st.metadata.indexMap {
-		names[index] = name
-	}
-	return names
-}
-
-// Len returns how many tensors are currently stored within the SafeTensors.
-func (st SafeTensors) Len() int {
-	return len(st.metadata.tensors)
-}
-
-// IsEmpty reports whether the SafeTensors contains any tensor.
-func (st SafeTensors) IsEmpty() bool {
-	return len(st.metadata.tensors) == 0
+	return TensorView{}, false
 }
 
 // Serialize the dictionary of tensors to a byte buffer.
@@ -208,8 +193,16 @@ func prepare(dataMap map[string]TensorView, dataInfo map[string]string) (prepare
 		tensors[i] = tensor
 	}
 
-	metadata := newMetadata(dataInfo, hMetadata)
-	metadataBuf, err := json.Marshal(metadata)
+	m := Metadata{
+		Metadata: dataInfo,
+		Names:    make([]string, len(hMetadata)),
+		Tensors:  make([]TensorInfo, len(hMetadata)),
+	}
+	for i, v := range hMetadata {
+		m.Names[i] = v.Name
+		m.Tensors[i] = v.TensorInfo
+	}
+	metadataBuf, err := json.Marshal(m)
 	if err != nil {
 		return preparedData{}, nil, fmt.Errorf("failed to JSON-marshal metadata: %w", err)
 	}
