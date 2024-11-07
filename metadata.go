@@ -179,13 +179,13 @@ func unmarshalTensorInfo(m map[string]any) (TensorInfo, error) {
 func unmarshalTIDType(m map[string]any) (DType, error) {
 	v, ok := m["dtype"]
 	if !ok {
-		return 0, fmt.Errorf(`missing "dtype"`)
+		return "", fmt.Errorf(`missing "dtype"`)
 	}
 	s, ok := v.(string)
-	if !ok {
-		return 0, fmt.Errorf(`invalid "dtype" value: %#v of type %T`, v, v)
+	if !ok || dTypeToSize[DType(s)] == 0 {
+		return "", fmt.Errorf(`invalid "dtype" value: %#v of type %T`, v, v)
 	}
-	return ParseDType(s)
+	return DType(s), nil
 }
 
 func unmarshalTIShape(m map[string]any) ([]uint64, error) {

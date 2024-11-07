@@ -33,7 +33,7 @@ func NewTensorView(dType DType, shape []uint64, data []byte) (TensorView, error)
 	numElements := numElementsFromShape(shape)
 
 	if n != numElements*dType.Size() {
-		return TensorView{}, fmt.Errorf("invalid tensor view: dtype=%d shape=%+v len(data)=%d", dType, shape, n)
+		return TensorView{}, fmt.Errorf("invalid tensor view: dtype=%s shape=%+v len(data)=%d", dType, shape, n)
 	}
 
 	return TensorView{
