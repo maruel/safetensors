@@ -92,53 +92,26 @@ func (st *SafeTensors) Tensor(name string) TensorView {
 	return TensorView{}
 }
 
-// Serialize the dictionary of tensors to a byte buffer.
-func Serialize(data map[string]TensorView, dataInfo map[string]string) ([]byte, error) {
-	pd, tensors, err := prepare(data, dataInfo)
-	if err != nil {
-		return nil, err
-	}
-	expectedSize := 8 + pd.n + pd.offset
-	buffer := make([]byte, 0, expectedSize)
-	buffer = binary.LittleEndian.AppendUint64(buffer, pd.n)
-	buffer = append(buffer, pd.headerBytes...)
-	for _, tensor := range tensors {
-		buffer = append(buffer, tensor.Data...)
-	}
-	return buffer, nil
-}
-
-// SerializeToWriter the dictionary of tensors to an io.Writer (such as a file).
-//
-// Compared to Serialize, this procedure reduces the need to allocate the
-// whole amount of memory.
-func SerializeToWriter(data map[string]TensorView, dataInfo map[string]string, w io.Writer) error {
+// Serialize the dictionary of tensors to an io.Writer (such as a file).
+func Serialize(data map[string]TensorView, dataInfo map[string]string, w io.Writer) error {
 	pd, tensors, err := prepare(data, dataInfo)
 	if err != nil {
 		return err
 	}
 
 	var nbArr [8]byte
-	nb := nbArr[:]
-	binary.LittleEndian.PutUint64(nb, pd.n)
-
-	_, err = w.Write(nb)
-	if err != nil {
+	binary.LittleEndian.PutUint64(nbArr[:], pd.n)
+	if _, err = w.Write(nbArr[:]); err != nil {
 		return err
 	}
-
-	_, err = w.Write(pd.headerBytes)
-	if err != nil {
+	if _, err = w.Write(pd.headerBytes); err != nil {
 		return err
 	}
-
 	for _, tensor := range tensors {
-		_, err = w.Write(tensor.Data)
-		if err != nil {
+		if _, err = w.Write(tensor.Data); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 

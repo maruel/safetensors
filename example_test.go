@@ -5,6 +5,7 @@
 package safetensors_test
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -61,13 +62,13 @@ func ExampleSerialize() {
 		"foo": tensor,
 	}
 
-	serialized, err := safetensors.Serialize(metadata, nil)
-	if err != nil {
+	buf := bytes.Buffer{}
+	if err := safetensors.Serialize(metadata, nil, &buf); err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("data len = %d\n", len(serialized))
-	fmt.Printf("data excerpt: ...%s...\n", serialized[8:30])
+	fmt.Printf("data len = %d\n", buf.Len())
+	fmt.Printf("data excerpt: ...%s...\n", buf.Bytes()[8:30])
 
 	// Output:
 	// data len = 96

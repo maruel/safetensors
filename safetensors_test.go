@@ -40,35 +40,23 @@ func TestSerialize(t *testing.T) {
 		for _, v := range floatData {
 			data = binary.LittleEndian.AppendUint32(data, math.Float32bits(v))
 		}
-
 		shape := []uint64{1, 2, 3}
-
 		attn0 := TensorView{DType: F32, Shape: shape, Data: data}
 		require.NoError(t, attn0.Validate())
+		metadata := map[string]TensorView{"attn.0": attn0}
 
-		metadata := map[string]TensorView{
-			"attn.0": attn0,
-		}
-
-		out, err := Serialize(metadata, nil)
-		require.NoError(t, err)
-
-		expected := []byte{
+		buf := bytes.Buffer{}
+		require.NoError(t, Serialize(metadata, nil, &buf))
+		want := []byte{
 			64, 0, 0, 0, 0, 0, 0, 0, 123, 34, 97, 116, 116, 110, 46, 48, 34, 58, 123, 34, 100,
 			116, 121, 112, 101, 34, 58, 34, 70, 51, 50, 34, 44, 34, 115, 104, 97, 112, 101, 34,
 			58, 91, 49, 44, 50, 44, 51, 93, 44, 34, 100, 97, 116, 97, 95, 111, 102, 102, 115,
 			101, 116, 115, 34, 58, 91, 48, 44, 50, 52, 93, 125, 125, 0, 0, 0, 0, 0, 0, 128, 63,
 			0, 0, 0, 64, 0, 0, 64, 64, 0, 0, 128, 64, 0, 0, 160, 64,
 		}
-		assert.Equal(t, expected, out)
-
-		_, err = Deserialize(out)
+		assert.Equal(t, want, buf.Bytes())
+		_, err := Deserialize(buf.Bytes())
 		require.NoError(t, err)
-
-		var buf bytes.Buffer
-		err = SerializeToWriter(metadata, nil, &buf)
-		require.NoError(t, err)
-		assert.Equal(t, expected, buf.Bytes())
 	})
 
 	t.Run("forced alignment", func(t *testing.T) {
@@ -77,21 +65,16 @@ func TestSerialize(t *testing.T) {
 		for _, v := range floatData {
 			data = binary.LittleEndian.AppendUint32(data, math.Float32bits(v))
 		}
-
 		shape := []uint64{1, 1, 2, 3}
-
 		attn0 := TensorView{DType: F32, Shape: shape, Data: data}
 		require.NoError(t, attn0.Validate())
+		// Smaller string to force misalignment compared to previous test.
+		metadata := map[string]TensorView{"attn0": attn0}
 
-		metadata := map[string]TensorView{
-			// Smaller string to force misalignment compared to previous test.
-			"attn0": attn0,
-		}
+		buf := bytes.Buffer{}
+		require.NoError(t, Serialize(metadata, nil, &buf))
 
-		out, err := Serialize(metadata, nil)
-		require.NoError(t, err)
-
-		expected := []byte{
+		want := []byte{
 			72, 0, 0, 0, 0, 0, 0, 0, 123, 34, 97, 116, 116, 110, 48, 34, 58, 123, 34, 100, 116,
 			121, 112, 101, 34, 58, 34, 70, 51, 50, 34, 44, 34, 115, 104, 97, 112, 101, 34, 58,
 			91, 49, 44, 49, 44, 50, 44, 51, 93, 44, 34, 100, 97, 116, 97, 95, 111, 102, 102,
@@ -101,15 +84,9 @@ func TestSerialize(t *testing.T) {
 			32, 32, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 64, 64, 0, 0, 128, 64, 0, 0,
 			160, 64,
 		}
-		assert.Equal(t, expected, out)
-
-		_, err = Deserialize(out)
+		assert.Equal(t, want, buf.Bytes())
+		_, err := Deserialize(buf.Bytes())
 		require.NoError(t, err)
-
-		var buf bytes.Buffer
-		err = SerializeToWriter(metadata, nil, &buf)
-		require.NoError(t, err)
-		assert.Equal(t, expected, buf.Bytes())
 	})
 }
 
@@ -175,30 +152,10 @@ func TestGPT2Like(t *testing.T) {
 				offset += n
 			}
 
-			{
-				var buf bytes.Buffer
-
-				out, err := Serialize(metadata, nil)
-				require.NoError(t, err)
-				_, err = buf.Write(out)
-				require.NoError(t, err)
-
-				raw := buf.Bytes()
-				_, err = Deserialize(raw)
-				require.NoError(t, err)
-			}
-
-			// Writer API
-			{
-				var buf bytes.Buffer
-
-				err := SerializeToWriter(metadata, nil, &buf)
-				require.NoError(t, err)
-
-				raw := buf.Bytes()
-				_, err = Deserialize(raw)
-				require.NoError(t, err)
-			}
+			buf := bytes.Buffer{}
+			require.NoError(t, Serialize(metadata, nil, &buf))
+			_, err := Deserialize(buf.Bytes())
+			require.NoError(t, err)
 		})
 	}
 }
@@ -236,12 +193,10 @@ func TestJSONAttack(t *testing.T) {
 
 	n := uint64(len(serialized))
 
-	var buf bytes.Buffer
-
+	buf := bytes.Buffer{}
 	var nbArr [8]byte
-	nb := nbArr[:]
-	binary.LittleEndian.PutUint64(nb, n)
-	_, err = buf.Write(nb)
+	binary.LittleEndian.PutUint64(nbArr[:], n)
+	_, err = buf.Write(nbArr[:])
 	require.NoError(t, err)
 
 	_, err = buf.Write(serialized)
