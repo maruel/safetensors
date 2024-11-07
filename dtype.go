@@ -67,8 +67,3 @@ var (
 func (dt DType) Size() uint64 {
 	return dTypeToSize[dt]
 }
-
-// String representation of a DType.
-func (dt DType) String() string {
-	return string(dt)
-}
