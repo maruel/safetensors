@@ -108,6 +108,20 @@ func (m *Metadata) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (m Metadata) MarshalJSON() ([]byte, error) {
+	// TODO: Keep ordering!
+	obj := make(map[string]any, len(m.Names)+1)
+	if len(m.Metadata) > 0 {
+		obj["__metadata__"] = m.Metadata
+	}
+	for index, name := range m.Names {
+		obj[name] = &m.Tensors[index]
+	}
+	return json.Marshal(obj)
+}
+
+//
+
 func unmarshalMetadata(value map[string]any) (map[string]string, error) {
 	result := make(map[string]string, len(value))
 	for k, v := range value {
@@ -214,14 +228,11 @@ func unmarshalTIDataOffsets(m map[string]any) ([2]uint64, error) {
 	return dataOffsets, nil
 }
 
-func (m Metadata) MarshalJSON() ([]byte, error) {
-	// TODO: Keep ordering!
-	obj := make(map[string]any, len(m.Names)+1)
-	if len(m.Metadata) > 0 {
-		obj["__metadata__"] = m.Metadata
+// checkedMul multiplies a and b and checks for overflow.
+func checkedMul(a, b uint64) (uint64, error) {
+	c := a * b
+	if a > 1 && b > 1 && c/a != b {
+		return c, fmt.Errorf("multiplication overflow: %d * %d", a, b)
 	}
-	for index, name := range m.Names {
-		obj[name] = &m.Tensors[index]
-	}
-	return json.Marshal(obj)
+	return c, nil
 }
