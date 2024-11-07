@@ -23,8 +23,8 @@ func ExampleDeserialize() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("len = %d\n", len(loaded.Metadata.Tensors))
-	fmt.Printf("names = %+v\n", loaded.Metadata.Names)
+	fmt.Printf("len = %d\n", len(loaded.Tensors))
+	fmt.Printf("names = %+v\n", loaded.Names)
 
 	tensor, ok := loaded.Tensor("test")
 	if !ok {

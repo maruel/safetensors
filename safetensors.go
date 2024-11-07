@@ -17,8 +17,8 @@ const maxHeaderSize = 100_000_000
 // SafeTensors is a structure owning some metadata to lookup tensors
 // on a shared `data` byte-buffer.
 type SafeTensors struct {
-	Metadata Metadata
-	data     []byte
+	Metadata
+	data []byte
 }
 
 // Deserialize parses a byte-buffer representing the whole
@@ -68,11 +68,11 @@ func ReadMetadata(buffer []byte) (uint64, Metadata, error) {
 	return n, metadata, nil
 }
 
-// Tensors returns a list of named views of all tensors.
-func (st SafeTensors) Tensors() []NamedTensorView {
-	tensors := make([]NamedTensorView, len(st.Metadata.Names))
-	for index, name := range st.Metadata.Names {
-		info := &st.Metadata.Tensors[index]
+// NamedTensors returns a list of named views of all tensors.
+func (st *SafeTensors) NamedTensors() []NamedTensorView {
+	tensors := make([]NamedTensorView, len(st.Names))
+	for index, name := range st.Names {
+		info := &st.Tensors[index]
 		tensors[index] = NamedTensorView{
 			Name: name,
 			TensorView: TensorView{
@@ -88,16 +88,16 @@ func (st SafeTensors) Tensors() []NamedTensorView {
 // Tensor retrieves a the view of a specific tensor by name.
 //
 // The returned boolean flag reports whether the tensor was found.
-func (st SafeTensors) Tensor(name string) (TensorView, bool) {
+func (st *SafeTensors) Tensor(name string) (TensorView, bool) {
 	// Linear search for now. Normally the number of tensors is at most in the
 	// low hundreds so it's not a big deal. If it becomes an issue, uses a
 	// private map.
-	for i, n := range st.Metadata.Names {
+	for i, n := range st.Names {
 		if n == name {
 			return TensorView{
-				DType: st.Metadata.Tensors[i].DType,
-				Shape: st.Metadata.Tensors[i].Shape,
-				Data:  st.data[st.Metadata.Tensors[i].DataOffsets[0]:st.Metadata.Tensors[i].DataOffsets[1]],
+				DType: st.Tensors[i].DType,
+				Shape: st.Tensors[i].Shape,
+				Data:  st.data[st.Tensors[i].DataOffsets[0]:st.Tensors[i].DataOffsets[1]],
 			}, true
 		}
 	}
