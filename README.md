@@ -11,3 +11,7 @@ Reference](https://pkg.go.dev/badge/github.com/maruel/safetensors/.svg)](https:/
 
 [![codecov](https://codecov.io/gh/maruel/safetensors/graph/badge.svg?token=PF3HM5CY1L)](https://codecov.io/gh/maruel/safetensors)
 
+
+## Credits
+
+This package is based on the work of the NLP Odyssey Authors.
