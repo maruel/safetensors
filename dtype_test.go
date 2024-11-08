@@ -5,6 +5,7 @@
 package safetensors
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -36,5 +37,33 @@ func TestDType(t *testing.T) {
 		if tc.in.WordSize() != tc.size {
 			t.Fatalf("%d != %d", tc.in.WordSize(), tc.size)
 		}
+	}
+}
+
+func TestDType_JSON(t *testing.T) {
+	d, err := json.Marshal(BOOL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got DType
+	if err = json.Unmarshal(d, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got != BOOL {
+		t.Fatal(got)
+	}
+}
+
+func TestDType_JSON_Invalid(t *testing.T) {
+	var got DType
+	if err := json.Unmarshal([]byte("1"), &got); err == nil || err.Error() != "json: cannot unmarshal number into Go value of type string" {
+		t.Fatal(err)
+	}
+	d, err := json.Marshal("invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(d, &got); err == nil || err.Error() != "\"invalid\" is not a valid DType" {
+		t.Fatal(err)
 	}
 }

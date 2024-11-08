@@ -4,6 +4,11 @@
 
 package safetensors
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // DType identifies a data type.
 //
 // It matches the DType type at
@@ -66,4 +71,17 @@ var DTypeToWordSize = map[DType]uint64{
 // WordSize returns the size in bytes of one element of this data type.
 func (dt DType) WordSize() uint64 {
 	return DTypeToWordSize[dt]
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (dt *DType) UnmarshalJSON(data []byte) error {
+	s := ""
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	if DTypeToWordSize[DType(s)] == 0 {
+		return fmt.Errorf("%q is not a valid DType", s)
+	}
+	*dt = DType(s)
+	return nil
 }
