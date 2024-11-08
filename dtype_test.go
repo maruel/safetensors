@@ -29,12 +29,12 @@ func TestDType(t *testing.T) {
 		{I64, 8},
 		{U64, 8},
 	}
-	if len(data) != len(dTypeToSize) {
+	if len(data) != len(DTypeToWordSize) {
 		t.Fatal("oops")
 	}
 	for _, tc := range data {
-		if tc.in.Size() != tc.size {
-			t.Fatalf("%d != %d", tc.in.Size(), tc.size)
+		if tc.in.WordSize() != tc.size {
+			t.Fatalf("%d != %d", tc.in.WordSize(), tc.size)
 		}
 	}
 }

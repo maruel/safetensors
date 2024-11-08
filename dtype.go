@@ -43,27 +43,27 @@ const (
 	U64 DType = "U64"
 )
 
-var (
-	dTypeToSize = map[DType]uint64{
-		BOOL:    1,
-		U8:      1,
-		I8:      1,
-		F8_E5M2: 1,
-		F8_E4M3: 1,
-		I16:     2,
-		U16:     2,
-		F16:     2,
-		BF16:    2,
-		I32:     4,
-		U32:     4,
-		F32:     4,
-		F64:     8,
-		I64:     8,
-		U64:     8,
-	}
-)
+// DTypeToWordSize is the map of each DType and the number of bytes it
+// represents.
+var DTypeToWordSize = map[DType]uint64{
+	BOOL:    1,
+	U8:      1,
+	I8:      1,
+	F8_E5M2: 1,
+	F8_E4M3: 1,
+	I16:     2,
+	U16:     2,
+	F16:     2,
+	BF16:    2,
+	I32:     4,
+	U32:     4,
+	F32:     4,
+	F64:     8,
+	I64:     8,
+	U64:     8,
+}
 
-// Size returns the size in bytes of one element of this data type.
-func (dt DType) Size() uint64 {
-	return dTypeToSize[dt]
+// WordSize returns the size in bytes of one element of this data type.
+func (dt DType) WordSize() uint64 {
+	return DTypeToWordSize[dt]
 }

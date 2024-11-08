@@ -151,14 +151,14 @@ func TestGPT2Like(t *testing.T) {
 			for _, td := range tensorsDesc {
 				dataSize += shapeProd(td.shape)
 			}
-			dataSize *= dType.Size()
+			dataSize *= dType.WordSize()
 
 			allData := make([]byte, dataSize)
 			metadata := make(map[string]TensorView, len(tensorsDesc))
 			offset := uint64(0)
 			for _, td := range tensorsDesc {
 				n := shapeProd(td.shape)
-				buffer := allData[offset : offset+n*dType.Size()]
+				buffer := allData[offset : offset+n*dType.WordSize()]
 				tensor := TensorView{DType: dType, Shape: td.shape, Data: buffer}
 				require.NoError(t, tensor.Validate())
 				metadata[td.name] = tensor

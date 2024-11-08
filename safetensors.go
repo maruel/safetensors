@@ -57,7 +57,7 @@ func (m Metadata) validate() (uint64, error) {
 		}
 
 		var err error
-		numBytes, err := checkedMul(numElements, info.DType.Size())
+		numBytes, err := checkedMul(numElements, info.DType.WordSize())
 		if err != nil {
 			return 0, fmt.Errorf("metadata validation error: failed to compute num bytes from num elements: %w", err)
 		}
@@ -199,7 +199,7 @@ func unmarshalTensorInfo(m map[string]any) (TensorInfo, error) {
 
 func unmarshalTIDType(v any) (DType, error) {
 	s, ok := v.(string)
-	if !ok || dTypeToSize[DType(s)] == 0 {
+	if !ok || DTypeToWordSize[DType(s)] == 0 {
 		return "", fmt.Errorf(`%#v of type %T`, v, v)
 	}
 	return DType(s), nil
@@ -297,7 +297,7 @@ type TensorView struct {
 // Validate validates the object.
 func (t *TensorView) Validate() error {
 	numElements := numElementsFromShape(t.Shape)
-	if n := uint64(len(t.Data)); n != numElements*t.DType.Size() {
+	if n := uint64(len(t.Data)); n != numElements*t.DType.WordSize() {
 		return fmt.Errorf("invalid tensor view: dtype=%s shape=%+v len(data)=%d", t.DType, t.Shape, n)
 	}
 	return nil
@@ -371,7 +371,7 @@ func prepare(dataMap map[string]TensorView, dataInfo map[string]string) ([]byte,
 	}
 	sort.Slice(data, func(i, j int) bool {
 		l, r := &data[i], &data[j]
-		ldt, rdt := l.TensorView.DType.Size(), r.TensorView.DType.Size()
+		ldt, rdt := l.TensorView.DType.WordSize(), r.TensorView.DType.WordSize()
 		return ldt > rdt || (ldt == rdt && l.Name < r.Name)
 	})
 
