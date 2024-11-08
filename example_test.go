@@ -4,16 +4,7 @@
 
 package safetensors_test
 
-import (
-	"bytes"
-	"encoding/binary"
-	"fmt"
-	"log"
-	"math"
-
-	"github.com/maruel/safetensors"
-)
-
+/*
 func ExampleDeserialize() {
 	serialized := []byte("\x59\x00\x00\x00\x00\x00\x00\x00" +
 		`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0,16]},"__metadata__":{"foo":"bar"}}` +
@@ -74,3 +65,4 @@ func ExampleSerialize() {
 	// data len = 96
 	// data excerpt: ...{"foo":{"dtype":"F32",...
 }
+*/

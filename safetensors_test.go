@@ -7,233 +7,174 @@ package safetensors
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
-	"fmt"
 	"math"
 	"strconv"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDeserialize(t *testing.T) {
-	serialized := []byte("Y\x00\x00\x00\x00\x00\x00\x00" +
+	d := []byte("Y\x00\x00\x00\x00\x00\x00\x00" +
 		`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0,16]},"__metadata__":{"foo":"bar"}}` +
 		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
-
-	loaded, err := Deserialize(serialized)
-	require.NoError(t, err)
-
-	assert.Equal(t, 1, len(loaded.Tensors))
-	assert.Equal(t, []string{"test"}, loaded.Names)
-
-	tensor := loaded.Tensor("test")
-	assert.Equal(t, I32, tensor.DType)
-	assert.Equal(t, []uint64{2, 2}, tensor.Shape)
-	assert.Equal(t, make([]byte, 16), tensor.Data)
+	got, err := Deserialize(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &SafeTensors{
+		Tensors:  []Tensor{{Name: "test", DType: I32, Shape: []uint64{2, 2}, Data: make([]byte, 16)}},
+		Metadata: map[string]string{"foo": "bar"},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("(-want,+got)\n%s", diff)
+	}
 }
 
 func TestSerialize(t *testing.T) {
+	floatData := []float32{0, 1, 2, 3, 4, 5}
+	data := make([]byte, 0, len(floatData)*4)
+	for _, v := range floatData {
+		data = binary.LittleEndian.AppendUint32(data, math.Float32bits(v))
+	}
 	t.Run("simple serialization", func(t *testing.T) {
-		floatData := []float32{0, 1, 2, 3, 4, 5}
-		data := make([]byte, 0, len(floatData)*4)
-		for _, v := range floatData {
-			data = binary.LittleEndian.AppendUint32(data, math.Float32bits(v))
-		}
-		attn0 := TensorView{DType: F32, Shape: []uint64{1, 2, 3}, Data: data}
-		require.NoError(t, attn0.Validate())
-		metadata := map[string]TensorView{"attn.0": attn0}
-
+		st := SafeTensors{Tensors: []Tensor{Tensor{Name: "attn.0", DType: F32, Shape: []uint64{1, 2, 3}, Data: data}}}
 		buf := bytes.Buffer{}
-		require.NoError(t, Serialize(metadata, nil, &buf))
-		want := []byte{
-			64, 0, 0, 0, 0, 0, 0, 0, 123, 34, 97, 116, 116, 110, 46, 48, 34, 58, 123, 34, 100,
-			116, 121, 112, 101, 34, 58, 34, 70, 51, 50, 34, 44, 34, 115, 104, 97, 112, 101, 34,
-			58, 91, 49, 44, 50, 44, 51, 93, 44, 34, 100, 97, 116, 97, 95, 111, 102, 102, 115,
-			101, 116, 115, 34, 58, 91, 48, 44, 50, 52, 93, 125, 125, 0, 0, 0, 0, 0, 0, 128, 63,
-			0, 0, 0, 64, 0, 0, 64, 64, 0, 0, 128, 64, 0, 0, 160, 64,
+		if err := st.Serialize(&buf); err != nil {
+			t.Fatal(err)
 		}
-		assert.Equal(t, want, buf.Bytes())
-		_, err := Deserialize(buf.Bytes())
-		require.NoError(t, err)
+		want := []byte(
+			"@\x00\x00\x00\x00\x00\x00\x00" +
+				"{\"attn.0\":{\"dtype\":\"F32\",\"shape\":[1,2,3],\"data_offsets\":[0,24]}}" +
+				"\x00\x00\x00\x00\x00\x00\x80?\x00\x00\x00@\x00\x00@@\x00\x00\x80@\x00\x00\xa0@")
+		if diff := cmp.Diff(want, buf.Bytes()); diff != "" {
+			t.Errorf("(-want,+got)\n%s", diff)
+		}
+		if _, err := Deserialize(buf.Bytes()); err != nil {
+			t.Fatal(err)
+		}
 	})
 
 	t.Run("forced alignment", func(t *testing.T) {
-		floatData := []float32{0, 1, 2, 3, 4, 5}
-		data := make([]byte, 0, len(floatData)*4)
-		for _, v := range floatData {
-			data = binary.LittleEndian.AppendUint32(data, math.Float32bits(v))
-		}
-		attn0 := TensorView{DType: F32, Shape: []uint64{1, 1, 2, 3}, Data: data}
-		require.NoError(t, attn0.Validate())
 		// Smaller string to force misalignment compared to previous test.
-		metadata := map[string]TensorView{"attn0": attn0}
-
+		st := SafeTensors{Tensors: []Tensor{Tensor{Name: "attn0", DType: F32, Shape: []uint64{1, 1, 2, 3}, Data: data}}}
 		buf := bytes.Buffer{}
-		require.NoError(t, Serialize(metadata, nil, &buf))
-
-		want := []byte{
-			72, 0, 0, 0, 0, 0, 0, 0, 123, 34, 97, 116, 116, 110, 48, 34, 58, 123, 34, 100, 116,
-			121, 112, 101, 34, 58, 34, 70, 51, 50, 34, 44, 34, 115, 104, 97, 112, 101, 34, 58,
-			91, 49, 44, 49, 44, 50, 44, 51, 93, 44, 34, 100, 97, 116, 97, 95, 111, 102, 102,
-			// All the 32 are forcing alignement of the tensor data for casting to f32, f64
-			// etc..
-			115, 101, 116, 115, 34, 58, 91, 48, 44, 50, 52, 93, 125, 125, 32, 32, 32, 32, 32,
-			32, 32, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 64, 64, 0, 0, 128, 64, 0, 0,
-			160, 64,
+		if err := st.Serialize(&buf); err != nil {
+			t.Fatal(err)
 		}
-		assert.Equal(t, want, buf.Bytes())
-		n, err := Deserialize(buf.Bytes())
-		require.NoError(t, err)
-
-		wantT := []NamedTensorView{
-			{
-				Name: "attn0",
-				TensorView: TensorView{
-					DType: "F32",
+		want := []byte(
+			"H\x00\x00\x00\x00\x00\x00\x00" +
+				"{\"attn0\":{\"dtype\":\"F32\",\"shape\":[1,1,2,3],\"data_offsets\":[0,24]}}" +
+				// All the 32 are forcing alignment of the tensor data for casting to f32, f64
+				// etc..
+				"       " +
+				"\x00\x00\x00\x00\x00\x00\x80?\x00\x00\x00@\x00\x00@@\x00\x00\x80@\x00\x00\xa0@")
+		if diff := cmp.Diff(want, buf.Bytes()); diff != "" {
+			t.Errorf("(-want,+got)\n%s", diff)
+		}
+		got, err := Deserialize(buf.Bytes())
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantT := &SafeTensors{
+			Tensors: []Tensor{
+				{
+					Name:  "attn0",
+					DType: F32,
 					Shape: []uint64{1, 1, 2, 3},
 					Data:  data,
 				},
 			},
 		}
-		if diff := cmp.Diff(wantT, n.NamedTensors()); diff != "" {
+		if diff := cmp.Diff(wantT, got); diff != "" {
+			t.Fatalf("(-want,+got)\n%s", diff)
+		}
+	})
+
+	t.Run("multiple", func(t *testing.T) {
+		// Make sure the deserialized version has the same order.
+		st := SafeTensors{
+			Tensors: []Tensor{
+				Tensor{Name: "attn.0", DType: I16, Shape: []uint64{1}, Data: []byte{1, 0}},
+				Tensor{Name: "attn.1", DType: I16, Shape: []uint64{2}, Data: []byte{5, 4, 3, 2}},
+				Tensor{Name: "attn.2", DType: I16, Shape: []uint64{1}, Data: []byte{7, 6}},
+			},
+			Metadata: map[string]string{"happy": "very"},
+		}
+		buf := bytes.Buffer{}
+		if err := st.Serialize(&buf); err != nil {
+			t.Fatal(err)
+		}
+		want := []byte(
+			"\xd0\x00\x00\x00\x00\x00\x00\x00" +
+				"{\"__metadata__\":{\"happy\":\"very\"},\"attn.0\":{\"dtype\":\"I16\",\"shape\":[1],\"data_offsets\":[0,2]},\"attn.1\":{\"dtype\":\"I16\",\"shape\":[2],\"data_offsets\":[2,6]},\"attn.2\":{\"dtype\":\"I16\",\"shape\":[1],\"data_offsets\":[6,8]}}" +
+				" " +
+				"\x01\x00\x05\x04\x03\x02\x07\x06")
+		if diff := cmp.Diff(want, buf.Bytes()); diff != "" {
+			t.Errorf("(-want,+got)\n%s", diff)
+		}
+		got, err := Deserialize(buf.Bytes())
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantT := &SafeTensors{
+			Tensors: []Tensor{
+				{
+					Name:  "attn.0",
+					DType: I16,
+					Shape: []uint64{1},
+					Data:  []byte{1, 0},
+				},
+				{
+					Name:  "attn.1",
+					DType: I16,
+					Shape: []uint64{2},
+					Data:  []byte{5, 4, 3, 2},
+				},
+				{
+					Name:  "attn.2",
+					DType: I16,
+					Shape: []uint64{1},
+					Data:  []byte{7, 6},
+				},
+			},
+			Metadata: map[string]string{"happy": "very"},
+		}
+		if diff := cmp.Diff(wantT, got); diff != "" {
 			t.Fatalf("(-want,+got)\n%s", diff)
 		}
 	})
 }
 
-func TestGPT2Like(t *testing.T) {
-	testCases := []struct {
-		name   string
-		nHeads int
-	}{
-		{"gpt2", 12},
-		{"gpt2_tiny", 6},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			type tensorDescType struct {
-				name  string
-				shape []uint64
-			}
-
-			tensorsDesc := make([]tensorDescType, 0)
-			addTensorDesc := func(name string, shape ...uint64) {
-				tensorsDesc = append(tensorsDesc, tensorDescType{name: name, shape: shape})
-			}
-
-			addTensorDesc("wte", 50257, 768)
-			addTensorDesc("wpe", 1024, 768)
-			for i := 0; i < tc.nHeads; i++ {
-				pre := fmt.Sprintf("h.%d.", i)
-				addTensorDesc(pre+"ln_1.weight", 768)
-				addTensorDesc(pre+"ln_1.bias", 768)
-				addTensorDesc(pre+"attn.bias", 1, 1, 1024, 1024)
-				addTensorDesc(pre+"attn.c_attn.weight", 768, 2304)
-				addTensorDesc(pre+"attn.c_attn.bias", 2304)
-				addTensorDesc(pre+"attn.c_proj.weight", 768, 768)
-				addTensorDesc(pre+"attn.c_proj.bias", 768)
-				addTensorDesc(pre+"ln_2.weight", 768)
-				addTensorDesc(pre+"ln_2.bias", 768)
-				addTensorDesc(pre+"mlp.c_fc.weight", 768, 3072)
-				addTensorDesc(pre+"mlp.c_fc.bias", 3072)
-				addTensorDesc(pre+"mlp.c_proj.weight", 3072, 768)
-				addTensorDesc(pre+"mlp.c_proj.bias", 768)
-			}
-			addTensorDesc("ln_f.weight", 768)
-			addTensorDesc("ln_f.bias", 768)
-
-			dType := F32
-
-			dataSize := uint64(0)
-			for _, td := range tensorsDesc {
-				dataSize += shapeProd(td.shape)
-			}
-			dataSize *= dType.WordSize()
-
-			allData := make([]byte, dataSize)
-			metadata := make(map[string]TensorView, len(tensorsDesc))
-			offset := uint64(0)
-			for _, td := range tensorsDesc {
-				n := shapeProd(td.shape)
-				buffer := allData[offset : offset+n*dType.WordSize()]
-				tensor := TensorView{DType: dType, Shape: td.shape, Data: buffer}
-				require.NoError(t, tensor.Validate())
-				metadata[td.name] = tensor
-				offset += n
-			}
-
-			buf := bytes.Buffer{}
-			require.NoError(t, Serialize(metadata, nil, &buf))
-			_, err := Deserialize(buf.Bytes())
-			require.NoError(t, err)
-		})
-	}
-}
-
 func TestEmptyShapesAllowed(t *testing.T) {
-	serialized := []byte("8\x00\x00\x00\x00\x00\x00\x00" +
+	d := []byte("8\x00\x00\x00\x00\x00\x00\x00" +
 		`{"test":{"dtype":"I32","shape":[],"data_offsets":[0,4]}}` +
-		"\x00\x00\x00\x00")
-
-	loaded, err := Deserialize(serialized)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"test"}, loaded.Names)
-	tensor := loaded.Tensor("test")
-	assert.Equal(t, I32, tensor.DType)
-	assert.Equal(t, []uint64{}, tensor.Shape)
-	assert.Equal(t, []byte{0, 0, 0, 0}, tensor.Data)
+		"\x01\x00\x00\x00")
+	got, err := Deserialize(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &SafeTensors{
+		Tensors: []Tensor{{Name: "test", DType: I32, Shape: []uint64{}, Data: []byte{1, 0, 0, 0}}},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("(-want,+got)\n%s", diff)
+	}
 }
 
 func TestZeroSizedTensor(t *testing.T) {
-	serialized := []byte("<\x00\x00\x00\x00\x00\x00\x00" +
+	d := []byte("<\x00\x00\x00\x00\x00\x00\x00" +
 		`{"test":{"dtype":"I32","shape":[2,0],"data_offsets":[0, 0]}}`)
-
-	loaded, err := Deserialize(serialized)
-	require.NoError(t, err)
-	require.Equal(t, []string{"test"}, loaded.Names)
-	tensor := loaded.Tensor("test")
-	assert.Equal(t, I32, tensor.DType)
-	assert.Equal(t, []uint64{2, 0}, tensor.Shape)
-	assert.Equal(t, []byte{}, tensor.Data)
-}
-
-func TestJSONAttack(t *testing.T) {
-	tensors := make(map[string]TensorInfo, 10)
-	dType := F32
-	shape := []uint64{2, 2}
-	dataOffsets := [2]uint64{0, 16}
-
-	for i := 0; i < 10; i++ {
-		tensors[fmt.Sprintf("weight_%d", i)] = TensorInfo{
-			DType:       dType,
-			Shape:       shape,
-			DataOffsets: dataOffsets,
-		}
+	got, err := Deserialize(d)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	serialized, err := json.Marshal(tensors)
-	require.NoError(t, err)
-
-	n := uint64(len(serialized))
-
-	buf := bytes.Buffer{}
-	var nbArr [8]byte
-	binary.LittleEndian.PutUint64(nbArr[:], n)
-	_, err = buf.Write(nbArr[:])
-	require.NoError(t, err)
-
-	_, err = buf.Write(serialized)
-	require.NoError(t, err)
-
-	_, err = buf.Write([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
-	require.NoError(t, err)
-
-	_, err = Deserialize(buf.Bytes())
-	assert.ErrorContains(t, err, "invalid metadata offset for tensor")
+	want := &SafeTensors{
+		Tensors: []Tensor{{Name: "test", DType: I32, Shape: []uint64{2, 0}, Data: make([]byte, 0)}},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("(-want,+got)\n%s", diff)
+	}
 }
 
 func TestDeserialize_Errors(t *testing.T) {
@@ -306,6 +247,13 @@ func TestDeserialize_Errors(t *testing.T) {
 				`{"test":{"dtype":"I32","shape":[2,18446744073709551614],"data_offsets":[0,16]}}` +
 				"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"),
 			"metadata validation error: failed to compute num elements from shape: multiplication overflow: 2 * 18446744073709551614",
+		},
+		{
+			"invalid data_offset",
+			[]byte("\x75\x00\x00\x00\x00\x00\x00\x00" +
+				`{"test1":{"dtype":"I32","shape":[1],"data_offsets":[0, 4]},` +
+				`"test2":{"dtype":"I32","shape":[1],"data_offsets":[0, 4]}}`),
+			"invalid metadata offset for tensor \"test2\"",
 		},
 	}
 	for i, line := range data {
