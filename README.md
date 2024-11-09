@@ -3,8 +3,8 @@
 ## Features
 
 - Memory efficient
-
-Based on the work of https://github.com/nlpodyssey/safetensors but with breaking API improvements.
+- Keep the tensor ordering as specified in the safetensors file.
+- Simple API
 
 See whole documentation at [![Go
 Reference](https://pkg.go.dev/badge/github.com/maruel/safetensors/.svg)](https://pkg.go.dev/github.com/maruel/safetensors/)
@@ -14,4 +14,4 @@ Reference](https://pkg.go.dev/badge/github.com/maruel/safetensors/.svg)](https:/
 
 ## Credits
 
-This package is based on the work of the NLP Odyssey Authors.
+This package is inspired on the work of the NLP Odyssey Authors.

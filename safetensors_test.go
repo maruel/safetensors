@@ -38,7 +38,7 @@ func TestSerialize(t *testing.T) {
 		data = binary.LittleEndian.AppendUint32(data, math.Float32bits(v))
 	}
 	t.Run("simple serialization", func(t *testing.T) {
-		st := SafeTensors{Tensors: []Tensor{Tensor{Name: "attn.0", DType: F32, Shape: []uint64{1, 2, 3}, Data: data}}}
+		st := SafeTensors{Tensors: []Tensor{{Name: "attn.0", DType: F32, Shape: []uint64{1, 2, 3}, Data: data}}}
 		buf := bytes.Buffer{}
 		if err := st.Serialize(&buf); err != nil {
 			t.Fatal(err)
@@ -57,7 +57,7 @@ func TestSerialize(t *testing.T) {
 
 	t.Run("forced alignment", func(t *testing.T) {
 		// Smaller string to force misalignment compared to previous test.
-		st := SafeTensors{Tensors: []Tensor{Tensor{Name: "attn0", DType: F32, Shape: []uint64{1, 1, 2, 3}, Data: data}}}
+		st := SafeTensors{Tensors: []Tensor{{Name: "attn0", DType: F32, Shape: []uint64{1, 1, 2, 3}, Data: data}}}
 		buf := bytes.Buffer{}
 		if err := st.Serialize(&buf); err != nil {
 			t.Fatal(err)
@@ -95,9 +95,9 @@ func TestSerialize(t *testing.T) {
 		// Make sure the deserialized version has the same order.
 		st := SafeTensors{
 			Tensors: []Tensor{
-				Tensor{Name: "attn.0", DType: I16, Shape: []uint64{1}, Data: []byte{1, 0}},
-				Tensor{Name: "attn.1", DType: I16, Shape: []uint64{2}, Data: []byte{5, 4, 3, 2}},
-				Tensor{Name: "attn.2", DType: I16, Shape: []uint64{1}, Data: []byte{7, 6}},
+				{Name: "attn.0", DType: I16, Shape: []uint64{1}, Data: []byte{1, 0}},
+				{Name: "attn.1", DType: I16, Shape: []uint64{2}, Data: []byte{5, 4, 3, 2}},
+				{Name: "attn.2", DType: I16, Shape: []uint64{1}, Data: []byte{7, 6}},
 			},
 			Metadata: map[string]string{"happy": "very"},
 		}
@@ -306,17 +306,4 @@ func Test_CheckedMul(t *testing.T) {
 			}
 		}
 	})
-}
-
-//
-
-func shapeProd(shape []uint64) uint64 {
-	if len(shape) == 0 {
-		return 0
-	}
-	p := shape[0]
-	for _, v := range shape[1:] {
-		p *= v
-	}
-	return p
 }
