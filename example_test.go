@@ -16,6 +16,24 @@ import (
 )
 
 func ExampleParse() {
+	// For real world usage, it is *strongly* recommended to memory map the file
+	// as *read only*. This leads to more than 2 times performance improvement
+	// and reduce resident memory usage by leveraging the OS' file cache more
+	// efficiently.
+	//
+	// Using package github.com/edsrzf/mmap-go:
+	//
+	//   f, err := os.OpenFile(name, os.O_RDONLY, 0o600)
+	//   if err != nil {
+	//   	log.Fatal(err)
+	//   }
+	//   defer f.Close()
+	//   serialized, err := mmap.Map(f, mmap.RDONLY, 0)
+	//   if err != nil {
+	//   	log.Fatal(err)
+	//   }
+	//   defer serialized.Unmap()
+
 	serialized := []byte("\x59\x00\x00\x00\x00\x00\x00\x00" +
 		`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0,16]},"__metadata__":{"foo":"bar"}}` +
 		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
@@ -44,7 +62,7 @@ func ExampleParse() {
 	// tensor data len = 16
 }
 
-func ExampleSafeTensors_Serialize() {
+func ExampleFile_Serialize() {
 	floatData := []float32{0, 1, 2, 3, 4, 5}
 	data := make([]byte, 0, len(floatData)*4)
 	for _, v := range floatData {
