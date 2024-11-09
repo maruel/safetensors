@@ -14,4 +14,5 @@ Reference](https://pkg.go.dev/badge/github.com/maruel/safetensors/.svg)](https:/
 
 ## Credits
 
-This package is inspired on the work of the NLP Odyssey Authors.
+This package is inspired on the work of the NLP Odyssey Authors, which was itself inspired by Hugging Face's
+[original Rust implementation](https://github.com/huggingface/safetensors).

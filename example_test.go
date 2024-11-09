@@ -1,10 +1,20 @@
+// Copyright 2024 Marc-Antoine Ruel. All rights reserved.
 // Copyright 2023 The NLP Odyssey Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 package safetensors_test
 
-/*
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"log"
+	"math"
+
+	"github.com/maruel/safetensors"
+)
+
 func ExampleDeserialize() {
 	serialized := []byte("\x59\x00\x00\x00\x00\x00\x00\x00" +
 		`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0,16]},"__metadata__":{"foo":"bar"}}` +
@@ -14,15 +24,14 @@ func ExampleDeserialize() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Printf("len = %d\n", len(loaded.Tensors))
-	fmt.Printf("names = %+v\n", loaded.Names)
-
-	tensor := loaded.Tensor("test")
-	if tensor.DType == "" {
-		log.Fatal(`tensor "test" not found`)
+	var names []string
+	for _, t := range loaded.Tensors {
+		names = append(names, t.Name)
 	}
+	fmt.Printf("len = %d\n", len(loaded.Tensors))
+	fmt.Printf("names = %+v\n", names)
 
+	tensor := loaded.Tensors[0]
 	fmt.Printf("tensor type = %s\n", tensor.DType)
 	fmt.Printf("tensor shape = %+v\n", tensor.Shape)
 	fmt.Printf("tensor data len = %+v\n", len(tensor.Data))
@@ -44,17 +53,16 @@ func ExampleSerialize() {
 
 	shape := []uint64{1, 2, 3}
 
-	tensor := safetensors.TensorView{DType: safetensors.F32, Shape: shape, Data: data}
+	tensor := safetensors.Tensor{Name: "foo", DType: safetensors.F32, Shape: shape, Data: data}
 	if err := tensor.Validate(); err != nil {
 		log.Fatal(err)
 	}
-
-	metadata := map[string]safetensors.TensorView{
-		"foo": tensor,
+	st := safetensors.SafeTensors{
+		Tensors: []safetensors.Tensor{tensor},
 	}
 
 	buf := bytes.Buffer{}
-	if err := safetensors.Serialize(metadata, nil, &buf); err != nil {
+	if err := st.Serialize(&buf); err != nil {
 		log.Fatal(err)
 	}
 
@@ -65,4 +73,3 @@ func ExampleSerialize() {
 	// data len = 96
 	// data excerpt: ...{"foo":{"dtype":"F32",...
 }
-*/
