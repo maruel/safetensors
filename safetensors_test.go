@@ -16,11 +16,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestDeserialize(t *testing.T) {
+func TestParse(t *testing.T) {
 	d := []byte("Y\x00\x00\x00\x00\x00\x00\x00" +
 		`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0,16]},"__metadata__":{"foo":"bar"}}` +
 		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
-	got, err := Deserialize(d)
+	got, err := Parse(d)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestSerialize(t *testing.T) {
 		if diff := cmp.Diff(want, buf.Bytes()); diff != "" {
 			t.Errorf("(-want,+got)\n%s", diff)
 		}
-		if _, err := Deserialize(buf.Bytes()); err != nil {
+		if _, err := Parse(buf.Bytes()); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -74,7 +74,7 @@ func TestSerialize(t *testing.T) {
 		if diff := cmp.Diff(want, buf.Bytes()); diff != "" {
 			t.Errorf("(-want,+got)\n%s", diff)
 		}
-		got, err := Deserialize(buf.Bytes())
+		got, err := Parse(buf.Bytes())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,7 +115,7 @@ func TestSerialize(t *testing.T) {
 		if diff := cmp.Diff(want, buf.Bytes()); diff != "" {
 			t.Errorf("(-want,+got)\n%s", diff)
 		}
-		got, err := Deserialize(buf.Bytes())
+		got, err := Parse(buf.Bytes())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -152,7 +152,7 @@ func TestEmptyShapesAllowed(t *testing.T) {
 	d := []byte("8\x00\x00\x00\x00\x00\x00\x00" +
 		`{"test":{"dtype":"I32","shape":[],"data_offsets":[0,4]}}` +
 		"\x01\x00\x00\x00")
-	got, err := Deserialize(d)
+	got, err := Parse(d)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestEmptyShapesAllowed(t *testing.T) {
 func TestZeroSizedTensor(t *testing.T) {
 	d := []byte("<\x00\x00\x00\x00\x00\x00\x00" +
 		`{"test":{"dtype":"I32","shape":[2,0],"data_offsets":[0, 0]}}`)
-	got, err := Deserialize(d)
+	got, err := Parse(d)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestZeroSizedTensor(t *testing.T) {
 	}
 }
 
-func TestDeserialize_Errors(t *testing.T) {
+func TestParse_Errors(t *testing.T) {
 	data := []struct {
 		name string
 		in   []byte
@@ -190,50 +190,50 @@ func TestDeserialize_Errors(t *testing.T) {
 			[]byte("<\x00\x00\x00\x00\x00\x00\x00" +
 				`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0,16]}}` +
 				"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00extra_bogus_data_for_polyglot_file"),
-			"metadata incomplete buffer",
+			"metadata incomplete buffer: 84 != 118",
 		},
 		{
 			"missing data",
 			[]byte("<\x00\x00\x00\x00\x00\x00\x00" +
 				`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0,16]}}` +
 				"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"), // <- missing 2 bytes
-			"metadata incomplete buffer",
+			"metadata incomplete buffer: 84 != 82",
 		},
 		{
 			"HeaderTooLarge",
 			[]byte("<\x00\x00\x00\x00\xff\xff\xff" +
 				`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0,16]}}` +
 				"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"),
-			"header too large: max 100000000, actual 18446742974197923900",
+			"invalid header: too large max 100000000, actual 18446742974197923900",
 		},
-		{"HeaderTooSmall0", []byte{}, "header (0 bytes) too small"},
-		{"HeaderTooSmall1", []byte{0}, "header (1 bytes) too small"},
-		{"HeaderTooSmall2", []byte{0, 0}, "header (2 bytes) too small"},
-		{"HeaderTooSmall3", []byte{0, 0, 0}, "header (3 bytes) too small"},
-		{"HeaderTooSmall4", []byte{0, 0, 0, 0}, "header (4 bytes) too small"},
-		{"HeaderTooSmall5", []byte{0, 0, 0, 0, 0}, "header (5 bytes) too small"},
-		{"HeaderTooSmall6", []byte{0, 0, 0, 0, 0, 0}, "header (6 bytes) too small"},
-		{"HeaderTooSmall7", []byte{0, 0, 0, 0, 0, 0, 0}, "header (7 bytes) too small"},
+		{"HeaderTooSmall0", []byte{}, "invalid header: too small (0 bytes)"},
+		{"HeaderTooSmall1", []byte{0}, "invalid header: too small (1 bytes)"},
+		{"HeaderTooSmall2", []byte{0, 0}, "invalid header: too small (2 bytes)"},
+		{"HeaderTooSmall3", []byte{0, 0, 0}, "invalid header: too small (3 bytes)"},
+		{"HeaderTooSmall4", []byte{0, 0, 0, 0}, "invalid header: too small (4 bytes)"},
+		{"HeaderTooSmall5", []byte{0, 0, 0, 0, 0}, "invalid header: too small (5 bytes)"},
+		{"HeaderTooSmall6", []byte{0, 0, 0, 0, 0, 0}, "invalid header: too small (6 bytes)"},
+		{"HeaderTooSmall7", []byte{0, 0, 0, 0, 0, 0, 0}, "invalid header: too small (7 bytes)"},
 		{
 			"InvalidHeaderLength",
 			[]byte("<\x00\x00\x00\x00\x00\x00\x00"),
-			"invalid header length 68",
+			"invalid header: invalid length 68",
 		},
 		{
 			"InvalidHeaderNonUTF8",
 			[]byte("\x01\x00\x00\x00\x00\x00\x00\x00\xff"),
-			"invalid header deserialization: invalid character 'ÿ' looking for beginning of value",
+			"invalid header: invalid character 'ÿ' looking for beginning of value",
 		},
 		{
 			"InvalidHeaderNotJSON",
 			[]byte("\x01\x00\x00\x00\x00\x00\x00\x00{"),
-			"invalid header deserialization: unexpected end of JSON input",
+			"invalid header: unexpected end of JSON input",
 		},
 		{
 			"InvalidInfo",
 			[]byte("<\x00\x00\x00\x00\x00\x00\x00" +
 				`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0, 4]}}`),
-			"metadata validation error: info data offsets mismatch",
+			"invalid metadata: tensor \"test\" #0: info data offsets mismatch",
 		},
 		{
 			// max uint64 = 18_446_744_073_709_551_615
@@ -241,27 +241,27 @@ func TestDeserialize_Errors(t *testing.T) {
 			[]byte("N\x00\x00\x00\x00\x00\x00\x00" +
 				`{"test":{"dtype":"I32","shape":[2,9223372036854775807],"data_offsets":[0,16]}}` +
 				"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"),
-			"metadata validation error: failed to compute num bytes from num elements: multiplication overflow: 18446744073709551614 * 4",
+			"invalid metadata: tensor \"test\" #0: failed to compute num bytes from num elements: multiplication overflow: 18446744073709551614 * 4",
 		},
 		{
 			"overflow the shape calculation",
 			[]byte("O\x00\x00\x00\x00\x00\x00\x00" +
 				`{"test":{"dtype":"I32","shape":[2,18446744073709551614],"data_offsets":[0,16]}}` +
 				"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"),
-			"metadata validation error: failed to compute num elements from shape: multiplication overflow: 2 * 18446744073709551614",
+			"invalid metadata: tensor \"test\" #0: failed to compute num elements from shape: multiplication overflow: 2 * 18446744073709551614",
 		},
 		{
 			"invalid data_offset",
 			[]byte("\x75\x00\x00\x00\x00\x00\x00\x00" +
 				`{"test1":{"dtype":"I32","shape":[1],"data_offsets":[0, 4]},` +
 				`"test2":{"dtype":"I32","shape":[1],"data_offsets":[0, 4]}}`),
-			"invalid metadata offset for tensor \"test2\"",
+			"invalid metadata: tensor \"test2\" #1: invalid offset",
 		},
 	}
 	for i, line := range data {
 		t.Run(strconv.Itoa(i)+": "+line.name, func(t *testing.T) {
-			if _, err := Deserialize(line.in); err == nil || err.Error() != line.err {
-				t.Fatal(err)
+			if _, err := Parse(line.in); err == nil || err.Error() != line.err {
+				t.Fatalf("Invalid error\nwant: %s\ngot:  %s", line.err, err)
 			}
 		})
 	}
@@ -328,6 +328,25 @@ func BenchmarkGPT2_Serialize(b *testing.B) {
 	}
 }
 
+func BenchmarkGPT2_Parse(b *testing.B) {
+	buf := bytes.Buffer{}
+	if err := fileGPT2.Serialize(&buf); err != nil {
+		b.Fatal(err)
+	}
+	d := buf.Bytes()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		f, err := Parse(d)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(f.Tensors) != 2+12*13+2 {
+			b.Fatal(len(f.Tensors))
+		}
+	}
+}
+
 func BenchmarkGPT2_Deserialize(b *testing.B) {
 	buf := bytes.Buffer{}
 	if err := fileGPT2.Serialize(&buf); err != nil {
@@ -337,7 +356,7 @@ func BenchmarkGPT2_Deserialize(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		f, err := Deserialize(d)
+		f, err := deserialize(bytes.NewReader(d))
 		if err != nil {
 			b.Fatal(err)
 		}

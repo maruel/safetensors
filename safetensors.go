@@ -41,23 +41,65 @@ type File struct {
 	Metadata map[string]string
 }
 
-// Deserialize parses a byte-buffer representing the whole safetensor file and
-// returns the deserialized form (no tensor allocation).
-func Deserialize(buffer []byte) (*File, error) {
-	var n uint64
-	var err error
-	r := safeTensorsHeader{}
-	n, err = r.parseHeader(buffer)
+// Parse parses a byte-buffer representing the whole safetensors file and
+// returns the deserialized form.
+//
+// It keeps references to the buffer so the buffer must not be modified afterwards.
+func Parse(buffer []byte) (*File, error) {
+	h := safeTensorsHeader{}
+	n, err := h.parseHeaderBytes(buffer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid header: %w", err)
 	}
-	f := &File{Metadata: r.metadata, Tensors: make([]Tensor, len(r.tensors))}
+	bufferEnd, err := h.validate()
+	if err != nil {
+		return nil, fmt.Errorf("invalid metadata: %w", err)
+	}
+	if bufferEnd+8+n != uint64(len(buffer)) {
+		return nil, fmt.Errorf("metadata incomplete buffer: %d != %d", bufferEnd+8+n, uint64(len(buffer)))
+	}
+	f := &File{Metadata: h.metadata, Tensors: make([]Tensor, len(h.tensors))}
 	data := buffer[n+8:]
-	for i := range r.tensors {
-		r.tensors[i].toTensor(&f.Tensors[i], data)
+	for i := range h.tensors {
+		h.tensors[i].toTensor(&f.Tensors[i], data[h.tensors[i].DataOffsets[0]:h.tensors[i].DataOffsets[1]])
 		if err := f.Tensors[i].Validate(); err != nil {
 			return nil, err
 		}
+	}
+	return f, nil
+}
+
+// deserialize parses a io.Reader representing the whole safetensors file and
+// returns the deserialized form.
+//
+// Unexported because it's slow as fuck.
+func deserialize(r io.Reader) (*File, error) {
+	h := safeTensorsHeader{}
+	n, err := h.parseHeaderReader(r)
+	if err != nil {
+		return nil, fmt.Errorf("invalid header: %w", err)
+	}
+	bufferEnd, err := h.validate()
+	if err != nil {
+		return nil, fmt.Errorf("invalid metadata: %w", err)
+	}
+	f := &File{Metadata: h.metadata, Tensors: make([]Tensor, len(h.tensors))}
+	total := n
+	for i := range h.tensors {
+		buf := bytes.Buffer{}
+		// BUG: Alignment!
+		x := h.tensors[i].DataOffsets[1] - h.tensors[i].DataOffsets[0]
+		if _, err := io.CopyN(&buf, r, int64(x)); err != nil {
+			return nil, fmt.Errorf("tensor %q #%d: read error: %w", h.tensors[i].name, i, err)
+		}
+		total += x
+		h.tensors[i].toTensor(&f.Tensors[i], buf.Bytes())
+		if err := f.Tensors[i].Validate(); err != nil {
+			return nil, err
+		}
+	}
+	if bufferEnd+n != total {
+		return nil, fmt.Errorf("metadata incomplete buffer: %d != %d", bufferEnd+8+n, total)
 	}
 	return f, nil
 }
@@ -179,30 +221,43 @@ func (h *safeTensorsHeader) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// parseHeader parses the header and returns the size of the header + parsed
+// parseHeaderBytes parses the header and returns the size of the header + parsed
 // data, given a byte-buffer representing the whole safetensor file.
-func (h *safeTensorsHeader) parseHeader(buffer []byte) (uint64, error) {
+func (h *safeTensorsHeader) parseHeaderBytes(buffer []byte) (uint64, error) {
 	bufferLen := uint64(len(buffer))
 	if bufferLen < 8 {
-		return 0, fmt.Errorf("header (%d bytes) too small", bufferLen)
+		return 0, fmt.Errorf("too small (%d bytes)", bufferLen)
 	}
 	n := binary.LittleEndian.Uint64(buffer)
 	if n > maxHeaderSize {
-		return 0, fmt.Errorf("header too large: max %d, actual %d", maxHeaderSize, n)
+		return 0, fmt.Errorf("too large max %d, actual %d", maxHeaderSize, n)
 	}
 	stop := n + 8
 	if stop > bufferLen {
-		return 0, fmt.Errorf("invalid header length %d", stop)
+		return 0, fmt.Errorf("invalid length %d", stop)
 	}
 	if err := json.Unmarshal(buffer[8:stop], h); err != nil {
-		return 0, fmt.Errorf("invalid header deserialization: %w", err)
-	}
-	bufferEnd, err := h.validate()
-	if err != nil {
 		return 0, err
 	}
-	if bufferEnd+8+n != bufferLen {
-		return 0, fmt.Errorf("metadata incomplete buffer")
+	return n, nil
+}
+
+// parseHeaderReader parses the header.
+func (h *safeTensorsHeader) parseHeaderReader(r io.Reader) (uint64, error) {
+	numBytes := [8]byte{}
+	if n, err := r.Read(numBytes[:]); n != len(numBytes) || err != nil {
+		return 0, fmt.Errorf("failed to read: %w", err)
+	}
+	n := binary.LittleEndian.Uint64(numBytes[:])
+	if n > maxHeaderSize {
+		return 0, fmt.Errorf("too large: max %d, actual %d", maxHeaderSize, n)
+	}
+	buf := make([]byte, int(n))
+	if n, err := r.Read(buf); n != len(buf) || err != nil {
+		return 0, fmt.Errorf("failed to read: %w", err)
+	}
+	if err := json.Unmarshal(buf, h); err != nil {
+		return 0, err
 	}
 	return n, nil
 }
@@ -213,25 +268,24 @@ func (h *safeTensorsHeader) parseHeader(buffer []byte) (uint64, error) {
 // correspond to the end of the data buffer.
 func (h *safeTensorsHeader) validate() (uint64, error) {
 	start := uint64(0)
-	for _, info := range h.tensors {
+	for i, info := range h.tensors {
 		// TODO: We should allow empty space for 8 bytes alignment.
 		if info.DataOffsets[0] != start || info.DataOffsets[1] < start {
-			return 0, fmt.Errorf("invalid metadata offset for tensor %q", info.name)
+			return 0, fmt.Errorf("tensor %q #%d: invalid offset", info.name, i)
 		}
 		numElements := uint64(1)
 		for _, v := range info.Shape {
 			var err error
 			if numElements, err = checkedMul(numElements, v); err != nil {
-				return 0, fmt.Errorf("metadata validation error: failed to compute num elements from shape: %w", err)
+				return 0, fmt.Errorf("tensor %q #%d: failed to compute num elements from shape: %w", info.name, i, err)
 			}
 		}
-
 		numBytes, err := checkedMul(numElements, info.DType.WordSize())
 		if err != nil {
-			return 0, fmt.Errorf("metadata validation error: failed to compute num bytes from num elements: %w", err)
+			return 0, fmt.Errorf("tensor %q #%d: failed to compute num bytes from num elements: %w", info.name, i, err)
 		}
 		if info.DataOffsets[1]-start != numBytes {
-			return 0, fmt.Errorf("metadata validation error: info data offsets mismatch")
+			return 0, fmt.Errorf("tensor %q #%d: info data offsets mismatch", info.name, i)
 		}
 		start = info.DataOffsets[1]
 	}
@@ -257,7 +311,7 @@ func (t *tensorInfo) toTensor(dst *Tensor, data []byte) {
 	dst.Name = t.name
 	dst.DType = t.DType
 	dst.Shape = t.Shape
-	dst.Data = data[t.DataOffsets[0]:t.DataOffsets[1]]
+	dst.Data = data
 }
 
 func (t *tensorInfo) fromTensor(src *Tensor, offset uint64) uint64 {

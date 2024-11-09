@@ -15,12 +15,12 @@ import (
 	"github.com/maruel/safetensors"
 )
 
-func ExampleDeserialize() {
+func ExampleParse() {
 	serialized := []byte("\x59\x00\x00\x00\x00\x00\x00\x00" +
 		`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0,16]},"__metadata__":{"foo":"bar"}}` +
 		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
 
-	loaded, err := safetensors.Deserialize(serialized)
+	loaded, err := safetensors.Parse(serialized)
 	if err != nil {
 		log.Fatal(err)
 	}
