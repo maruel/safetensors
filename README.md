@@ -2,7 +2,7 @@
 
 ## Features
 
-- Memory efficient
+- Performance and Memory efficient, including benchmarks. 0.25ms to decode GPT2.
 - Keep the tensor ordering as specified in the safetensors file.
 - Simple API
 

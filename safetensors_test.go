@@ -8,6 +8,7 @@ package safetensors
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"strconv"
 	"testing"
@@ -308,3 +309,74 @@ func Test_CheckedMul(t *testing.T) {
 		}
 	})
 }
+
+func BenchmarkGPT2_Serialize(b *testing.B) {
+	f := fileGPT2
+	buf := bytes.Buffer{}
+	// Do it once so it doesn't count the buf internal memory allocation.
+	if err := f.Serialize(&buf); err != nil {
+		b.Fatal(err)
+	}
+	buf.Reset()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if err := f.Serialize(&buf); err != nil {
+			b.Fatal(err)
+		}
+		buf.Reset()
+	}
+}
+
+func BenchmarkGPT2_Deserialize(b *testing.B) {
+	buf := bytes.Buffer{}
+	if err := fileGPT2.Serialize(&buf); err != nil {
+		b.Fatal(err)
+	}
+	d := buf.Bytes()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		f, err := Deserialize(d)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(f.Tensors) != 2+12*13+2 {
+			b.Fatal(len(f.Tensors))
+		}
+	}
+}
+
+var fileGPT2 = func() *File {
+	makeTensor := func(name string, shape []uint64) Tensor {
+		s := F32.WordSize()
+		for _, x := range shape {
+			s *= x
+		}
+		return Tensor{Name: "wte", DType: F32, Shape: shape, Data: make([]byte, s)}
+	}
+	f := &File{
+		Tensors: []Tensor{
+			makeTensor("wte", []uint64{50257, 768}),
+			makeTensor("wpe", []uint64{1024, 768}),
+		},
+	}
+	for i := range 12 {
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.ln_1.weight", i), []uint64{768}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.ln_1.bias", i), []uint64{768}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.attn.bias", i), []uint64{1, 1, 1024, 1024}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.attn.c_attn.weight", i), []uint64{768, 2304}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.attn.c_attn.bias", i), []uint64{2304}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.attn.c_proj.weight", i), []uint64{768, 768}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.attn.c_proj.bias", i), []uint64{768}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.ln_2.weight", i), []uint64{768}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.ln_2.bias", i), []uint64{768}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.mlp.c_fc.weight", i), []uint64{768, 3072}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.mlp.c_fc.bias", i), []uint64{3072}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.mlp.c_proj.weight", i), []uint64{3072, 768}))
+		f.Tensors = append(f.Tensors, makeTensor(fmt.Sprintf("h.%d.mlp.c_proj.bias", i), []uint64{768}))
+	}
+	f.Tensors = append(f.Tensors, makeTensor("ln_f.weight", []uint64{768}))
+	f.Tensors = append(f.Tensors, makeTensor("ln_f.bias", []uint64{768}))
+	return f
+}()
