@@ -57,12 +57,12 @@ func ExampleSafeTensors_Serialize() {
 	if err := tensor.Validate(); err != nil {
 		log.Fatal(err)
 	}
-	st := safetensors.SafeTensors{
+	f := safetensors.File{
 		Tensors: []safetensors.Tensor{tensor},
 	}
 
 	buf := bytes.Buffer{}
-	if err := st.Serialize(&buf); err != nil {
+	if err := f.Serialize(&buf); err != nil {
 		log.Fatal(err)
 	}
 

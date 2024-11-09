@@ -23,7 +23,7 @@ func TestDeserialize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := &SafeTensors{
+	want := &File{
 		Tensors:  []Tensor{{Name: "test", DType: I32, Shape: []uint64{2, 2}, Data: make([]byte, 16)}},
 		Metadata: map[string]string{"foo": "bar"},
 	}
@@ -39,9 +39,9 @@ func TestSerialize(t *testing.T) {
 		data = binary.LittleEndian.AppendUint32(data, math.Float32bits(v))
 	}
 	t.Run("simple serialization", func(t *testing.T) {
-		st := SafeTensors{Tensors: []Tensor{{Name: "attn.0", DType: F32, Shape: []uint64{1, 2, 3}, Data: data}}}
+		f := File{Tensors: []Tensor{{Name: "attn.0", DType: F32, Shape: []uint64{1, 2, 3}, Data: data}}}
 		buf := bytes.Buffer{}
-		if err := st.Serialize(&buf); err != nil {
+		if err := f.Serialize(&buf); err != nil {
 			t.Fatal(err)
 		}
 		want := []byte(
@@ -58,9 +58,9 @@ func TestSerialize(t *testing.T) {
 
 	t.Run("forced alignment", func(t *testing.T) {
 		// Smaller string to force misalignment compared to previous test.
-		st := SafeTensors{Tensors: []Tensor{{Name: "attn0", DType: F32, Shape: []uint64{1, 1, 2, 3}, Data: data}}}
+		f := File{Tensors: []Tensor{{Name: "attn0", DType: F32, Shape: []uint64{1, 1, 2, 3}, Data: data}}}
 		buf := bytes.Buffer{}
-		if err := st.Serialize(&buf); err != nil {
+		if err := f.Serialize(&buf); err != nil {
 			t.Fatal(err)
 		}
 		want := []byte(
@@ -77,7 +77,7 @@ func TestSerialize(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		wantT := &SafeTensors{
+		wantT := &File{
 			Tensors: []Tensor{
 				{
 					Name:  "attn0",
@@ -94,7 +94,7 @@ func TestSerialize(t *testing.T) {
 
 	t.Run("multiple", func(t *testing.T) {
 		// Make sure the deserialized version has the same order.
-		st := SafeTensors{
+		f := File{
 			Tensors: []Tensor{
 				{Name: "attn.0", DType: I16, Shape: []uint64{1}, Data: []byte{1, 0}},
 				{Name: "attn.1", DType: I16, Shape: []uint64{2}, Data: []byte{5, 4, 3, 2}},
@@ -103,7 +103,7 @@ func TestSerialize(t *testing.T) {
 			Metadata: map[string]string{"happy": "very"},
 		}
 		buf := bytes.Buffer{}
-		if err := st.Serialize(&buf); err != nil {
+		if err := f.Serialize(&buf); err != nil {
 			t.Fatal(err)
 		}
 		want := []byte(
@@ -118,7 +118,7 @@ func TestSerialize(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		wantT := &SafeTensors{
+		wantT := &File{
 			Tensors: []Tensor{
 				{
 					Name:  "attn.0",
@@ -155,7 +155,7 @@ func TestEmptyShapesAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := &SafeTensors{
+	want := &File{
 		Tensors: []Tensor{{Name: "test", DType: I32, Shape: []uint64{}, Data: []byte{1, 0, 0, 0}}},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
@@ -170,7 +170,7 @@ func TestZeroSizedTensor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := &SafeTensors{
+	want := &File{
 		Tensors: []Tensor{{Name: "test", DType: I32, Shape: []uint64{2, 0}, Data: make([]byte, 0)}},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {

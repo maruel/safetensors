@@ -34,16 +34,16 @@ func (t *Tensor) Validate() error {
 	return nil
 }
 
-// SafeTensors is a structure owning some metadata to lookup tensors
-// on a shared `data` byte-buffer.
-type SafeTensors struct {
+// File is a structure owning some metadata to lookup tensors on a shared
+// `data` byte-buffer.
+type File struct {
 	Tensors  []Tensor
 	Metadata map[string]string
 }
 
 // Deserialize parses a byte-buffer representing the whole safetensor file and
 // returns the deserialized form (no tensor allocation).
-func Deserialize(buffer []byte) (*SafeTensors, error) {
+func Deserialize(buffer []byte) (*File, error) {
 	var n uint64
 	var err error
 	r := safeTensorsHeader{}
@@ -51,26 +51,26 @@ func Deserialize(buffer []byte) (*SafeTensors, error) {
 	if err != nil {
 		return nil, err
 	}
-	st := &SafeTensors{Metadata: r.metadata, Tensors: make([]Tensor, len(r.tensors))}
+	f := &File{Metadata: r.metadata, Tensors: make([]Tensor, len(r.tensors))}
 	data := buffer[n+8:]
 	for i := range r.tensors {
-		r.tensors[i].toTensor(&st.Tensors[i], data)
-		if err := st.Tensors[i].Validate(); err != nil {
+		r.tensors[i].toTensor(&f.Tensors[i], data)
+		if err := f.Tensors[i].Validate(); err != nil {
 			return nil, err
 		}
 	}
-	return st, nil
+	return f, nil
 }
 
 // Serialize the list of tensors to an io.Writer.
-func (st *SafeTensors) Serialize(w io.Writer) error {
-	r := safeTensorsHeader{metadata: st.Metadata, tensors: make([]tensorInfo, len(st.Tensors))}
+func (f *File) Serialize(w io.Writer) error {
+	r := safeTensorsHeader{metadata: f.Metadata, tensors: make([]tensorInfo, len(f.Tensors))}
 	var offset uint64
 	for i := range r.tensors {
-		if err := st.Tensors[i].Validate(); err != nil {
+		if err := f.Tensors[i].Validate(); err != nil {
 			return err
 		}
-		offset = r.tensors[i].fromTensor(&st.Tensors[i], offset)
+		offset = r.tensors[i].fromTensor(&f.Tensors[i], offset)
 	}
 	b, err := r.MarshalJSON()
 	if err != nil {
@@ -88,7 +88,7 @@ func (st *SafeTensors) Serialize(w io.Writer) error {
 	if _, err := w.Write(b); err != nil {
 		return err
 	}
-	for _, t := range st.Tensors {
+	for _, t := range f.Tensors {
 		// TODO: It's unhealthy to not align the data at 8 bytes.
 		if _, err := w.Write(t.Data); err != nil {
 			return err
@@ -96,6 +96,8 @@ func (st *SafeTensors) Serialize(w io.Writer) error {
 	}
 	return nil
 }
+
+//
 
 // safeTensorsHeader represents the header of safetensors file.
 type safeTensorsHeader struct {
@@ -267,8 +269,6 @@ func (t *tensorInfo) fromTensor(src *Tensor, offset uint64) uint64 {
 	t.DataOffsets[1] = offset
 	return offset
 }
-
-//
 
 const maxHeaderSize = 100_000_000
 
