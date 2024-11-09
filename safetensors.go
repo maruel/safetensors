@@ -89,6 +89,7 @@ func deserialize(r io.Reader) (*File, error) {
 		buf := bytes.Buffer{}
 		// BUG: Alignment!
 		x := h.tensors[i].DataOffsets[1] - h.tensors[i].DataOffsets[0]
+		buf.Grow(int(x))
 		if _, err := io.CopyN(&buf, r, int64(x)); err != nil {
 			return nil, fmt.Errorf("tensor %q #%d: read error: %w", h.tensors[i].name, i, err)
 		}
