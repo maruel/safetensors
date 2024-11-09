@@ -44,7 +44,7 @@ func ExampleDeserialize() {
 	// tensor data len = 16
 }
 
-func ExampleSerialize() {
+func ExampleSafeTensors_Serialize() {
 	floatData := []float32{0, 1, 2, 3, 4, 5}
 	data := make([]byte, 0, len(floatData)*4)
 	for _, v := range floatData {
