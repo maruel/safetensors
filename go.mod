@@ -6,4 +6,9 @@ module github.com/maruel/safetensors
 
 go 1.23.3
 
-require github.com/google/go-cmp v0.6.0
+require (
+	github.com/edsrzf/mmap-go v1.2.0
+	github.com/google/go-cmp v0.6.0
+)
+
+require golang.org/x/sys v0.27.0 // indirect

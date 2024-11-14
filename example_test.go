@@ -15,25 +15,27 @@ import (
 	"github.com/maruel/safetensors"
 )
 
-func ExampleParse() {
-	// For real world usage, it is *strongly* recommended to memory map the file
-	// as *read only*. This leads to more than 2 times performance improvement
-	// and reduce resident memory usage by leveraging the OS' file cache more
-	// efficiently.
-	//
-	// Using package github.com/edsrzf/mmap-go:
-	//
-	//   f, err := os.OpenFile(name, os.O_RDONLY, 0o600)
-	//   if err != nil {
-	//   	log.Fatal(err)
-	//   }
-	//   defer f.Close()
-	//   serialized, err := mmap.Map(f, mmap.RDONLY, 0)
-	//   if err != nil {
-	//   	log.Fatal(err)
-	//   }
-	//   defer serialized.Unmap()
+// This is the recommended way to load safe tensors as it is the most efficient.
+func ExampleMapped() {
+	m := safetensors.Mapped{}
+	if err := m.Open("path/to/model.safetensors"); err != nil {
+		log.Fatal(err)
+	}
+	defer m.Close()
+	var names []string
+	for _, t := range m.Tensors {
+		names = append(names, t.Name)
+	}
+	fmt.Printf("len = %d\n", len(m.Tensors))
+	fmt.Printf("names = %+v\n", names)
 
+	tensor := m.Tensors[0]
+	fmt.Printf("tensor type = %s\n", tensor.DType)
+	fmt.Printf("tensor shape = %+v\n", tensor.Shape)
+	fmt.Printf("tensor data len = %+v\n", len(tensor.Data))
+}
+
+func ExampleParse() {
 	serialized := []byte("\x59\x00\x00\x00\x00\x00\x00\x00" +
 		`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0,16]},"__metadata__":{"foo":"bar"}}` +
 		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
