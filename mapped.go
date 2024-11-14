@@ -22,9 +22,11 @@ type Mapped struct {
 
 // Close releases the memory region and the file handle.
 func (s *Mapped) Close() error {
-	s.m.Unmap()
-	s.f.Close()
-	return nil
+	err := s.m.Unmap()
+	if err2 := s.f.Close(); err == nil {
+		err = err2
+	}
+	return err
 }
 
 // Open opens a file and memory maps it read-only.
@@ -35,14 +37,14 @@ func (s *Mapped) Open(name string) error {
 	}
 	m, err := mmap.Map(f, mmap.RDONLY, 0)
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	s.f = f
 	s.m = m
 	s.File, err = Parse(m)
 	if err != nil {
-		s.Close()
+		_ = s.Close()
 		return err
 	}
 	return nil
