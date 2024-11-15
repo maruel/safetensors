@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 )
 
 // Tensor is a view of a Tensor within a file.
@@ -268,12 +269,22 @@ func (h *safeTensorsHeader) parseHeaderReader(r io.Reader) (uint64, error) {
 // In case of success, it returns the last seen offset position, that should
 // correspond to the end of the data buffer.
 func (h *safeTensorsHeader) validate() (uint64, error) {
+	// Validate the tensors in sorted order based on the order they are present
+	// in the file. I've only observed unordered tensors with "MLX" style
+	// SafeTensors file. Do not modify the order that we loaded the tensors.
+	indexes := make([]int, len(h.tensors))
+	for i := range indexes {
+		indexes[i] = i
+	}
+	sort.Slice(indexes, func(i, j int) bool {
+		return h.tensors[indexes[i]].DataOffsets[0] < h.tensors[indexes[j]].DataOffsets[0]
+	})
 	start := uint64(0)
-	for i, info := range h.tensors {
-		if err := info.validate(start); err != nil {
-			return 0, fmt.Errorf("tensor %q #%d: %w", info.name, i, err)
+	for num, idx := range indexes {
+		if err := h.tensors[idx].validate(start); err != nil {
+			return 0, fmt.Errorf("tensor %q #%d: %w", h.tensors[idx].name, num, err)
 		}
-		start = info.DataOffsets[1]
+		start = h.tensors[idx].DataOffsets[1]
 	}
 	return start, nil
 }
