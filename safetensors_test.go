@@ -233,7 +233,7 @@ func TestParse_Errors(t *testing.T) {
 			"InvalidInfo",
 			[]byte("<\x00\x00\x00\x00\x00\x00\x00" +
 				`{"test":{"dtype":"I32","shape":[2,2],"data_offsets":[0, 4]}}`),
-			"invalid metadata: tensor \"test\" #0: info data offsets mismatch",
+			"invalid metadata: tensor \"test\" #0: info data offsets mismatch: expected 16, got 4",
 		},
 		{
 			// max uint64 = 18_446_744_073_709_551_615
@@ -255,7 +255,7 @@ func TestParse_Errors(t *testing.T) {
 			[]byte("\x75\x00\x00\x00\x00\x00\x00\x00" +
 				`{"test1":{"dtype":"I32","shape":[1],"data_offsets":[0, 4]},` +
 				`"test2":{"dtype":"I32","shape":[1],"data_offsets":[0, 4]}}`),
-			"invalid metadata: tensor \"test2\" #1: invalid offset",
+			"invalid metadata: tensor \"test2\" #1: invalid offset start: expected 4, got 0",
 		},
 	}
 	for i, line := range data {

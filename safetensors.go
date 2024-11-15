@@ -165,7 +165,7 @@ func (h *safeTensorsHeader) UnmarshalJSON(data []byte) error {
 		}
 		keyStr, ok := key.(string)
 		if !ok {
-			return errors.New("invalid json")
+			return fmt.Errorf("invalid json; expected string, got %T", key)
 		}
 		if keyStr == "__metadata__" {
 			if err := dec.Decode(&h.metadata); err != nil {
@@ -270,23 +270,8 @@ func (h *safeTensorsHeader) parseHeaderReader(r io.Reader) (uint64, error) {
 func (h *safeTensorsHeader) validate() (uint64, error) {
 	start := uint64(0)
 	for i, info := range h.tensors {
-		// TODO: We should allow empty space for 8 bytes alignment.
-		if info.DataOffsets[0] != start || info.DataOffsets[1] < start {
-			return 0, fmt.Errorf("tensor %q #%d: invalid offset", info.name, i)
-		}
-		numElements := uint64(1)
-		for _, v := range info.Shape {
-			var err error
-			if numElements, err = checkedMul(numElements, v); err != nil {
-				return 0, fmt.Errorf("tensor %q #%d: failed to compute num elements from shape: %w", info.name, i, err)
-			}
-		}
-		numBytes, err := checkedMul(numElements, info.DType.WordSize())
-		if err != nil {
-			return 0, fmt.Errorf("tensor %q #%d: failed to compute num bytes from num elements: %w", info.name, i, err)
-		}
-		if info.DataOffsets[1]-start != numBytes {
-			return 0, fmt.Errorf("tensor %q #%d: info data offsets mismatch", info.name, i)
+		if err := info.validate(start); err != nil {
+			return 0, fmt.Errorf("tensor %q #%d: %w", info.name, i, err)
 		}
 		start = info.DataOffsets[1]
 	}
@@ -323,6 +308,31 @@ func (t *tensorInfo) fromTensor(src *Tensor, offset uint64) uint64 {
 	offset += uint64(len(src.Data))
 	t.DataOffsets[1] = offset
 	return offset
+}
+
+func (t *tensorInfo) validate(start uint64) error {
+	// TODO: We should allow empty space for 8 bytes alignment.
+	if t.DataOffsets[0] != start {
+		return fmt.Errorf("invalid offset start: expected %d, got %d", start, t.DataOffsets[0])
+	}
+	if t.DataOffsets[1] < start {
+		return fmt.Errorf("invalid offset end: %d < %d", t.DataOffsets[1], start)
+	}
+	numElements := uint64(1)
+	for _, v := range t.Shape {
+		var err error
+		if numElements, err = checkedMul(numElements, v); err != nil {
+			return fmt.Errorf("failed to compute num elements from shape: %w", err)
+		}
+	}
+	numBytes, err := checkedMul(numElements, t.DType.WordSize())
+	if err != nil {
+		return fmt.Errorf("failed to compute num bytes from num elements: %w", err)
+	}
+	if got := t.DataOffsets[1] - start; got != numBytes {
+		return fmt.Errorf("info data offsets mismatch: expected %d, got %d", numBytes, got)
+	}
+	return nil
 }
 
 const maxHeaderSize = 100_000_000
